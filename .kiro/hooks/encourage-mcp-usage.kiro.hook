@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Encourage MCP Tool Usage",
+  "description": "Reminds the agent to leverage MCP servers (Memory, Sequential Thinking, Context7, Playwright) for complex problem solving, persistent context, and knowledge retrieval",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before proceeding, consider if any MCP tools would help:\n- Memory: Store/retrieve project decisions, API integration details, or testing strategies\n- Sequential Thinking: Break down complex architectural decisions or multi-step debugging\n- Context7: Search for relevant code patterns or documentation across the project\n- Playwright: Test web-based API documentation or automate browser interactions\n\nUse these tools proactively when they match the task requirements."
+  },
+  "workspaceFolderName": "CountMe",
+  "shortName": "encourage-mcp-usage"
+}

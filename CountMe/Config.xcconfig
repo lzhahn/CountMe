@@ -1,0 +1,6 @@
+// Configuration variables for CountMe
+// Add your actual values here - this file should NOT be committed
+// Copy this to Config.local.xcconfig and add your real credentials there
+
+FATSECRET_CONSUMER_KEY = 
+FATSECRET_CONSUMER_SECRET =

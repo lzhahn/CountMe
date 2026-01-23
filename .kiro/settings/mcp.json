@@ -1,0 +1,43 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "description": "Browser automation and testing tools for web scraping and E2E testing",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "memory": {
+      "description": "Persistent memory storage for maintaining context across conversations",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "autoApprove": [
+        "create_entities",
+        "add_observations"
+      ]
+    },
+    "sequential-thinking": {
+      "description": "Enhanced reasoning through step-by-step thought process documentation",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "autoApprove": [
+        "sequentialthinking",
+        "sequentialthinking"
+      ]
+    },
+    "context7": {
+      "description": "Semantic search and knowledge retrieval from Upstash vector database",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+build/
+
+# Secrets
+CountMe/Secrets.swift
+CountMe/Config.local.xcconfig
+
+# macOS
+.DS_Store

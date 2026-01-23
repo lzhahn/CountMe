@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Update Docs on Source Change",
+  "description": "Automatically updates README.md and relevant documentation when Swift source files, models, or configuration files are modified",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the changes made to the edited file and update the relevant documentation. If the change affects public APIs, architecture, or user-facing features, update README.md. If there's a specific feature folder in .kiro/specs/, update the documentation there. Ensure all public APIs have proper documentation including parameters, return values, and usage examples.\n\nFor any documentation put them into their respective folder I.e.:\n\n- .Kiro\n - Documentation\n  - <Featue/Tool>\n   - <File's>"
+  },
+  "workspaceFolderName": "CountMe",
+  "shortName": "update-docs-on-change"
+}

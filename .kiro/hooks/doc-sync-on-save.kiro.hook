@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Documentation Sync",
+  "description": "Automatically updates README.md and documentation when Swift source files or project configuration files are modified",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the changes made to the edited file. If the changes affect public APIs, architecture, configuration, or user-facing functionality, update the relevant documentation:\n- Update README.md for user-facing changes, setup instructions, or major features\n- Update inline code documentation for API changes\n- Update .kiro/specs/ documentation if architecture or design is affected\n- Update .kiro/steering/project-foundation.md if project structure or patterns change\n\nFocus on keeping documentation accurate and helpful. Only update docs if the code changes warrant it."
+  },
+  "workspaceFolderName": "CountMe",
+  "shortName": "doc-sync-on-save"
+}
