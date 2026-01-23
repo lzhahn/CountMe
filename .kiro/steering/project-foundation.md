@@ -51,14 +51,32 @@ SwiftUI Views → View Models → Business Logic → Data Store (SwiftData)
 - `DailyLog.swift`: Container for a day's food items with goal tracking
 - `NutritionSearchResult.swift`: API response mapping
 - `FoodItemSource.swift`: Enum for tracking data origin (API vs manual)
+- `CustomMeal.swift`: Custom meal definitions
+- `Ingredient.swift`: Ingredient data for custom meals
 
-**Business Logic**:
+**Services** (`CountMe/Services/`):
 - `DataStore.swift`: Actor-based SwiftData persistence layer
+- `NutritionAPIClient.swift`: FatSecret API integration
 - `OAuth1SignatureGenerator.swift`: FatSecret API authentication
+- `CalorieTracker.swift`: Business logic for calorie calculations
 
-**Views**:
+**Views** (`CountMe/Views/`):
 - `ContentView.swift`: Main application view
-- `CountMeApp.swift`: Application entry point
+- `MainCalorieView.swift`: Primary calorie tracking interface
+- `FoodSearchView.swift`: API search interface
+- `ManualEntryView.swift`: Manual food entry form
+- `ServingAdjustmentView.swift`: Serving size adjustment UI
+- `FoodItemRow.swift`: Individual food item display component
+- `SearchResultRow.swift`: Search result display component
+- `GoalSettingView.swift`: Daily calorie goal configuration
+- `HistoricalView.swift`: Historical data viewing interface
+
+**Utilities** (`CountMe/Utilities/`):
+- `Config.swift`: Application configuration management
+- `Secrets.swift`: API credentials and sensitive data
+
+**App Entry**:
+- `CountMeApp.swift`: Application entry point (root level)
 
 ## FatSecret API Integration
 
@@ -194,30 +212,76 @@ SwiftUI Views → View Models → Business Logic → Data Store (SwiftData)
 
 ```
 CountMe/
-├── Models/              # Data models (group related models together)
-├── Views/               # SwiftUI views (organize by feature/screen)
-├── ViewModels/          # View models (mirror Views structure)
+├── Assets.xcassets/     # App assets and resources
+├── Models/              # Data models
+│   ├── CustomMeal.swift
+│   ├── DailyLog.swift
+│   ├── FoodItem.swift
+│   ├── FoodItemSource.swift
+│   ├── Ingredient.swift
+│   └── NutritionSearchResult.swift
+├── Views/               # SwiftUI views
+│   ├── ContentView.swift
+│   ├── FoodItemRow.swift
+│   ├── FoodSearchView.swift
+│   ├── GoalSettingView.swift
+│   ├── HistoricalView.swift
+│   ├── MainCalorieView.swift
+│   ├── ManualEntryView.swift
+│   ├── SearchResultRow.swift
+│   └── ServingAdjustmentView.swift
 ├── Services/            # Business logic and API clients
-├── Utilities/           # Helper functions and extensions
-├── DataStore.swift      # Persistence layer
-└── CountMeApp.swift     # App entry
+│   ├── CalorieTracker.swift
+│   ├── DataStore.swift
+│   ├── NutritionAPIClient.swift
+│   └── OAuth1SignatureGenerator.swift
+├── Utilities/           # Helper functions and configuration
+│   ├── Config.swift
+│   └── Secrets.swift
+├── CountMeApp.swift     # App entry point
+└── Item.swift           # Legacy file
 
 CountMeTests/
 ├── Models/              # Model tests (mirror source structure)
+│   └── FoodItemMacroTests.swift
 ├── Services/            # Service tests
-├── Properties/          # Property-based tests
-└── Integration/         # Integration tests
+│   ├── NutritionAPIClientTests.swift
+│   └── OAuth1SignatureGeneratorTests.swift
+├── Views/               # View tests
+│   └── CoreUIFlowsTests.swift
+├── CountMeTests.swift   # General test utilities
+└── CrashRecoveryTests.swift  # Integration tests
 
 .kiro/
 ├── specs/               # Feature specifications (one folder per feature)
-│   └── calorie-tracking/
-│       ├── requirements.md      # User stories & acceptance criteria
-│       ├── design.md           # Architecture & correctness properties
-│       └── tasks.md            # Implementation tasks
+│   ├── calorie-tracking/
+│   │   ├── requirements.md      # User stories & acceptance criteria
+│   │   ├── design.md           # Architecture & correctness properties
+│   │   └── tasks.md            # Implementation tasks
+│   ├── ai-recipe-tracking/
+│   └── file-structure-refactor/
 ├── settings/
 │   └── mcp.json            # MCP server configuration
 └── steering/               # Project guidelines (this file)
 ```
+
+### Import Statements
+
+**Important**: Swift uses module-based imports, not file path imports. All files in the CountMe target are part of the same module, so moving files within the target does NOT require import statement changes.
+
+Example:
+```swift
+// Before refactoring: CountMe/DataStore.swift
+import SwiftData
+
+// After refactoring: CountMe/Services/DataStore.swift
+import SwiftData  // No changes needed!
+
+// Other files importing DataStore - NO CHANGES NEEDED
+// The import is module-based, not path-based
+```
+
+This means you can reorganize files freely within the CountMe module without updating any import statements in your code.
 
 ### Folder Organization Principles
 
