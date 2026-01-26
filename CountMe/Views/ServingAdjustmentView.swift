@@ -208,6 +208,11 @@ struct ServingAdjustmentView: View {
                     adjustedServingSizeString = String(format: "%.1f", servingMultiplier)
                 }
                 
+                // Calculate adjusted macro values (apply serving multiplier)
+                let adjustedProtein = searchResult.protein.map { $0 * servingMultiplier }
+                let adjustedCarbs = searchResult.carbohydrates.map { $0 * servingMultiplier }
+                let adjustedFats = searchResult.fats.map { $0 * servingMultiplier }
+                
                 // Create FoodItem with adjusted values
                 let foodItem = FoodItem(
                     name: searchResult.name,
@@ -215,7 +220,10 @@ struct ServingAdjustmentView: View {
                     timestamp: Date(),
                     servingSize: adjustedServingSizeString,
                     servingUnit: searchResult.servingUnit,
-                    source: .api
+                    source: .api,
+                    protein: adjustedProtein,
+                    carbohydrates: adjustedCarbs,
+                    fats: adjustedFats
                 )
                 
                 // Add to current daily log
@@ -264,7 +272,10 @@ struct ServingAdjustmentView: View {
             calories: 165,
             servingSize: "100",
             servingUnit: "g",
-            brandName: "Generic"
+            brandName: "Generic",
+            protein: 31.0,
+            carbohydrates: 0.0,
+            fats: 3.6
         ),
         tracker: tracker
     )

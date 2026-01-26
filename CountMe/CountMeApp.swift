@@ -14,6 +14,8 @@ struct CountMeApp: App {
         let schema = Schema([
             FoodItem.self,
             DailyLog.self,
+            CustomMeal.self,
+            Ingredient.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

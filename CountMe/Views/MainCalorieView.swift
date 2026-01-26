@@ -17,11 +17,15 @@ import SwiftData
 /// - Visual feedback when goal is exceeded
 /// - Navigation to food search
 /// - List of today's food items
+/// - Macro breakdown (protein, carbs, fats) for daily totals
 ///
-/// Requirements: 3.4, 4.2, 4.3, 4.4, 1.1, 5.1
+/// Requirements: 3.4, 4.2, 4.3, 4.4, 1.1, 5.1, 5.2
 struct MainCalorieView: View {
     /// The calorie tracker business logic
     @Bindable var tracker: CalorieTracker
+    
+    /// The custom meal manager for browsing custom meals
+    @Bindable var customMealManager: CustomMealManager
     
     /// Controls navigation to food search view
     @State private var showingFoodSearch = false
@@ -37,6 +41,15 @@ struct MainCalorieView: View {
             VStack(spacing: 20) {
                 // Daily total and progress section
                 dailyTotalSection
+                
+                // Macro breakdown section
+                if let log = tracker.currentLog {
+                    MacroDisplayView(
+                        protein: log.totalProtein,
+                        carbohydrates: log.totalCarbohydrates,
+                        fats: log.totalFats
+                    )
+                }
                 
                 // Food items list
                 foodItemsList
@@ -65,7 +78,7 @@ struct MainCalorieView: View {
                 }
             }
             .sheet(isPresented: $showingFoodSearch) {
-                FoodSearchView(tracker: tracker)
+                FoodSearchView(tracker: tracker, customMealManager: customMealManager)
             }
             .sheet(isPresented: $showingGoalSetting) {
                 GoalSettingView(tracker: tracker)
@@ -246,16 +259,20 @@ struct MainCalorieView: View {
 #Preview {
     // Create an in-memory model container for preview
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
+    let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self, configurations: config)
     let context = ModelContext(container)
     
+    let dataStore = DataStore(modelContext: context)
     let tracker = CalorieTracker(
-        dataStore: DataStore(modelContext: context),
+        dataStore: dataStore,
         apiClient: NutritionAPIClient(
             consumerKey: "preview",
             consumerSecret: "preview"
         )
     )
     
-    MainCalorieView(tracker: tracker)
+    let aiParser = AIRecipeParser()
+    let customMealManager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
+    
+    MainCalorieView(tracker: tracker, customMealManager: customMealManager)
 }

@@ -20,6 +20,15 @@ iOS calorie tracking app with FatSecret API integration.
 - **Real-time Updates**: Daily total updates immediately when adding or removing items
 - **Goal Management**: Set and track daily calorie goals with remaining calories display
 - **Food History**: View all food items logged for the day with timestamps
+- **Macro Tracking**: Track protein, carbohydrates, and fats alongside calories (when available)
+
+### Custom Meals (In Development)
+- **AI Recipe Parsing**: Describe recipes in natural language and have AI parse them into ingredients
+- **Reusable Meals**: Save custom meals with multiple ingredients for quick logging
+- **Macro Breakdown**: Full nutritional breakdown including protein, carbs, and fats
+- **Serving Adjustments**: Scale serving sizes with proportional nutritional recalculation
+- **Meal Library**: Browse, search, and manage saved custom meals
+- **Offline Access**: All saved meals available offline
 
 ### Data Persistence
 - **Local Storage**: All data stored locally using SwiftData for offline access
@@ -55,9 +64,11 @@ iOS calorie tracking app with FatSecret API integration.
 - **NutritionAPIClient**: Actor handling FatSecret API communication with OAuth 1.0
 
 ### Data Models
-- **FoodItem**: Individual food entry with nutritional data (SwiftData model)
-- **DailyLog**: Container for a day's food items with computed totals (SwiftData model)
+- **FoodItem**: Individual food entry with nutritional data including optional macros (SwiftData model)
+- **DailyLog**: Container for a day's food items with computed totals and macro tracking (SwiftData model)
 - **NutritionSearchResult**: API response representation for search results
+- **CustomMeal**: Reusable meal template with multiple ingredients (SwiftData model)
+- **Ingredient**: Component of a custom meal with full nutritional data (SwiftData model)
 
 ## Usage
 

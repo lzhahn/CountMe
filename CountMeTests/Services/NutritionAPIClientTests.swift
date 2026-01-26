@@ -127,6 +127,13 @@ final class NutritionAPIClientTests: XCTestCase {
         XCTAssertEqual(results[0].servingSize, "100")
         XCTAssertEqual(results[0].servingUnit, "g")
         XCTAssertNil(results[0].brandName)
+        // Verify macro data
+        XCTAssertNotNil(results[0].protein)
+        XCTAssertEqual(results[0].protein!, 0.26, accuracy: 0.01)
+        XCTAssertNotNil(results[0].carbohydrates)
+        XCTAssertEqual(results[0].carbohydrates!, 13.81, accuracy: 0.01)
+        XCTAssertNotNil(results[0].fats)
+        XCTAssertEqual(results[0].fats!, 0.17, accuracy: 0.01)
         
         // Verify second result
         XCTAssertEqual(results[1].id, "456")
@@ -135,6 +142,12 @@ final class NutritionAPIClientTests: XCTestCase {
         XCTAssertEqual(results[1].servingSize, "1")
         XCTAssertEqual(results[1].servingUnit, "cup")
         XCTAssertEqual(results[1].brandName, "Tropicana")
+        // Verify macro data (no protein in this response)
+        XCTAssertNil(results[1].protein)
+        XCTAssertNotNil(results[1].carbohydrates)
+        XCTAssertEqual(results[1].carbohydrates!, 28.00, accuracy: 0.01)
+        XCTAssertNotNil(results[1].fats)
+        XCTAssertEqual(results[1].fats!, 0.00, accuracy: 0.01)
     }
     
     func testSearchFoodEmptyResults() async throws {
@@ -462,6 +475,92 @@ final class NutritionAPIClientTests: XCTestCase {
         XCTAssertNil(unit, "Should return nil unit when no serving info found")
     }
     
+    // MARK: - Macro Extraction Tests (Task 17)
+    
+    func testExtractMacroProtein() {
+        // Test typical FatSecret format
+        let description1 = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
+        let result1 = extractMacroFromDescription(description1, macroName: "Protein")
+        XCTAssertNotNil(result1)
+        XCTAssertEqual(result1!, 8.00, accuracy: 0.01, "Should extract 8.00g protein")
+        
+        // Test with decimal values
+        let description2 = "Per 1 serving - Calories: 150kcal | Protein: 12.5g"
+        let result2 = extractMacroFromDescription(description2, macroName: "Protein")
+        XCTAssertNotNil(result2)
+        XCTAssertEqual(result2!, 12.5, accuracy: 0.01, "Should extract 12.5g protein")
+        
+        // Test with space before g
+        let description3 = "Per 1 cup - Protein: 20 g"
+        let result3 = extractMacroFromDescription(description3, macroName: "Protein")
+        XCTAssertNotNil(result3)
+        XCTAssertEqual(result3!, 20.0, accuracy: 0.01, "Should extract 20g protein with space")
+    }
+    
+    func testExtractMacroCarbs() {
+        let description = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
+        let result = extractMacroFromDescription(description, macroName: "Carbs")
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result!, 30.00, accuracy: 0.01, "Should extract 30.00g carbs")
+    }
+    
+    func testExtractMacroFat() {
+        let description = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
+        let result = extractMacroFromDescription(description, macroName: "Fat")
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result!, 10.00, accuracy: 0.01, "Should extract 10.00g fat")
+    }
+    
+    func testExtractMacroMissing() {
+        // Test when macro is not present
+        let description = "Per 100g - Calories: 250kcal | Fat: 10.00g"
+        let result = extractMacroFromDescription(description, macroName: "Protein")
+        XCTAssertNil(result, "Should return nil when macro not found")
+    }
+    
+    func testExtractMacroZeroValue() {
+        // Test with zero value
+        let description = "Per 100g - Calories: 250kcal | Fat: 0.00g | Carbs: 30.00g"
+        let result = extractMacroFromDescription(description, macroName: "Fat")
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result!, 0.00, accuracy: 0.01, "Should extract 0.00g fat")
+    }
+    
+    func testSearchFoodWithMissingMacros() async throws {
+        // Mock response with partial macro data
+        let mockJSON = """
+        {
+            "foods": {
+                "food": [
+                    {
+                        "food_id": "789",
+                        "food_name": "Partial Macros Food",
+                        "food_type": "Generic",
+                        "food_description": "Per 100g - Calories: 100kcal | Carbs: 20.00g"
+                    }
+                ]
+            }
+        }
+        """
+        
+        MockURLProtocol.mockData = mockJSON.data(using: .utf8)
+        MockURLProtocol.mockResponse = HTTPURLResponse(
+            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        
+        let results = try await client.searchFood(query: "test")
+        
+        XCTAssertEqual(results.count, 1, "Should return 1 result")
+        XCTAssertEqual(results[0].calories, 100.0)
+        XCTAssertNotNil(results[0].carbohydrates)
+        XCTAssertEqual(results[0].carbohydrates!, 20.00, accuracy: 0.01)
+        XCTAssertNil(results[0].protein, "Protein should be nil when not in response")
+        XCTAssertNil(results[0].fats, "Fats should be nil when not in response")
+    }
+    
     // MARK: - Helper Methods
     
     private func extractCaloriesFromDescription(_ description: String) -> Double? {
@@ -505,5 +604,25 @@ final class NutritionAPIClientTests: XCTestCase {
         let unit = nsString.substring(with: unitRange)
         
         return (size, unit)
+    }
+    
+    private func extractMacroFromDescription(_ description: String, macroName: String) -> Double? {
+        let pattern = "\(macroName):\\s*(\\d+(?:\\.\\d+)?)\\s*g"
+        
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return nil
+        }
+        
+        let nsString = description as NSString
+        let range = NSRange(location: 0, length: nsString.length)
+        
+        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
+            return nil
+        }
+        
+        let valueRange = match.range(at: 1)
+        let valueString = nsString.substring(with: valueRange)
+        
+        return Double(valueString)
     }
 }

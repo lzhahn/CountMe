@@ -86,7 +86,10 @@ struct SearchResultRow: View {
                 calories: 165,
                 servingSize: "100",
                 servingUnit: "g",
-                brandName: "Generic"
+                brandName: "Generic",
+                protein: 31.0,
+                carbohydrates: 0.0,
+                fats: 3.6
             )
         )
         
@@ -97,7 +100,10 @@ struct SearchResultRow: View {
                 calories: 95,
                 servingSize: "1",
                 servingUnit: "medium",
-                brandName: nil
+                brandName: nil,
+                protein: 0.5,
+                carbohydrates: 25.0,
+                fats: 0.3
             )
         )
         
@@ -108,7 +114,10 @@ struct SearchResultRow: View {
                 calories: 200,
                 servingSize: "1",
                 servingUnit: "bar",
-                brandName: "Quest"
+                brandName: "Quest",
+                protein: 20.0,
+                carbohydrates: 22.0,
+                fats: 8.0
             )
         )
     }

@@ -170,13 +170,21 @@ actor NutritionAPIClient {
                 // Parse serving information from description
                 let (servingSize, servingUnit) = parseServingInfo(from: food.foodDescription)
                 
+                // Extract macro data from description
+                let protein = extractMacro(from: food.foodDescription, macroName: "Protein")
+                let carbs = extractMacro(from: food.foodDescription, macroName: "Carbs")
+                let fats = extractMacro(from: food.foodDescription, macroName: "Fat")
+                
                 return NutritionSearchResult(
                     id: food.foodId,
                     name: food.foodName,
                     calories: calories,
                     servingSize: servingSize,
                     servingUnit: servingUnit,
-                    brandName: food.brandName
+                    brandName: food.brandName,
+                    protein: protein,
+                    carbohydrates: carbs,
+                    fats: fats
                 )
             }
         } catch {
@@ -239,6 +247,36 @@ actor NutritionAPIClient {
         let unit = nsString.substring(with: unitRange)
         
         return (size, unit)
+    }
+    
+    /// Extracts a macro value (protein, carbs, or fat) from food description
+    /// Format examples:
+    /// - "Protein: 8.00g"
+    /// - "Fat: 10.00g"
+    /// - "Carbs: 30.00g"
+    /// - Parameter description: The food description string
+    /// - Parameter macroName: The name of the macro to extract (e.g., "Protein", "Fat", "Carbs")
+    /// - Returns: The macro value in grams, or nil if not found
+    private func extractMacro(from description: String, macroName: String) -> Double? {
+        // Look for pattern "MacroName: XXXg" or "MacroName: XXX g"
+        let pattern = "\(macroName):\\s*(\\d+(?:\\.\\d+)?)\\s*g"
+        
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return nil
+        }
+        
+        let nsString = description as NSString
+        let range = NSRange(location: 0, length: nsString.length)
+        
+        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
+            return nil
+        }
+        
+        // Extract the numeric value
+        let valueRange = match.range(at: 1)
+        let valueString = nsString.substring(with: valueRange)
+        
+        return Double(valueString)
     }
 }
 

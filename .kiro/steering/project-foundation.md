@@ -176,6 +176,28 @@ SwiftUI Views → View Models → Business Logic → Data Store (SwiftData)
 5. Test offline scenarios and data recovery
 6. **Document test coverage gaps and edge cases discovered**
 
+### When Executing Bulk Tasks
+**For large task lists create new sessions to maintain clarity:**
+
+1. **Break work into logical chunks** - Group related tasks (e.g., all model changes, all view updates)
+2. **Start fresh sessions for each chunk** - Prevents context bloat and token limit issues
+3. **Document progress between sessions** - Update task lists with completion status
+4. **Reference previous work explicitly** - Link to completed files or decisions from prior sessions
+5. **Use Memory MCP to persist context** - Store architectural decisions and implementation notes across sessions
+
+**When to create a new session:**
+- Implementing 5+ tasks from a task list
+- Working across 10+ files
+- Switching between major feature areas (Models → Views → Services)
+- After completing a logical milestone (all tests passing, feature complete)
+- When context becomes cluttered with debugging output or test results
+
+**Benefits:**
+- Cleaner context for better decision-making
+- Faster response times with smaller context windows
+- Easier to track progress and identify issues
+- Reduced risk of token limit errors mid-implementation
+
 ## Code Style Guidelines
 
 ### Swift Conventions

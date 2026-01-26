@@ -42,7 +42,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 8: Daily Log Macro Totals Invariant**
   - **Validates: Requirements 5.2, 6.5**
 
-- [ ] 4. Extend DataStore with CustomMeal persistence operations
+- [x] 4. Extend DataStore with CustomMeal persistence operations
   - Add `fetchAllCustomMeals()` method to retrieve all saved custom meals
   - Add `fetchCustomMeal(id: UUID)` method to retrieve a specific meal
   - Add `saveCustomMeal(_ meal: CustomMeal)` method to persist a new meal
@@ -64,7 +64,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 5: Cascade Deletion Completeness**
   - **Validates: Requirements 2.3**
 
-- [ ] 5. Implement AIRecipeParser actor for AI service integration
+- [x] 5. Implement AIRecipeParser actor for AI service integration
   - Create AIRecipeParser actor with URLSession and API configuration
   - Implement structured prompt with JSON schema enforcement (use design document prompt)
   - Implement `parseRecipe(description: String)` method with 30-second timeout
@@ -93,7 +93,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 18: AI Response Parsing Completeness**
   - **Validates: Requirements 7.2**
 
-- [ ] 6. Implement serving size calculation utilities
+- [x] 6. Implement serving size calculation utilities
   - Create `applyServingMultiplier(_ multiplier: Double, to ingredient: Ingredient)` function
   - Multiply all nutritional values (calories, protein, carbs, fats, quantity) by multiplier
   - Validate multiplier is positive (> 0), reject zero or negative values
@@ -110,7 +110,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - Test that original ingredient is unchanged after applying multiplier
   - _Requirements: 4.2_
 
-- [ ] 7. Implement CustomMealManager business logic
+- [x] 7. Implement CustomMealManager business logic
   - Create CustomMealManager class with @Observable annotation
   - Add properties: savedMeals array, isLoading bool, errorMessage optional string
   - Inject DataStore and AIRecipeParser dependencies
@@ -136,7 +136,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 10: Serving Size Multiplier Immutability**
   - **Validates: Requirements 4.4**
 
-- [ ] 8. Implement data validation utilities
+- [x] 8. Implement data validation utilities
   - Create validation function for nutritional values (non-negative check)
   - Create validation function for required ingredient fields (name, calories)
   - Create validation function for serving sizes (positive check)
@@ -156,12 +156,12 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 21: Validation Rule Consistency**
   - **Validates: Requirements 10.5**
 
-- [ ] 9. Checkpoint - Ensure all data layer and business logic tests pass
+- [x] 9. Checkpoint - Ensure all data layer and business logic tests pass
   - Run all property tests and unit tests for models, DataStore, AIRecipeParser, and CustomMealManager
   - Verify 90%+ code coverage for business logic
   - Ask the user if questions arise
 
-- [ ] 10. Implement RecipeInputView for AI parsing
+- [x] 10. Implement RecipeInputView for AI parsing
   - Create SwiftUI view with multi-line TextField for recipe description
   - Add character count display (10-500 character limit)
   - Add "Parse Recipe" button that calls CustomMealManager.parseRecipe()
@@ -172,7 +172,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - Disable parse button when offline (check network reachability)
   - _Requirements: 1.1, 1.4, 7.3, 11.3_
 
-- [ ] 11. Implement IngredientReviewView for parsed ingredient editing
+- [x] 11. Implement IngredientReviewView for parsed ingredient editing
   - Create SwiftUI view that displays list of parsed ingredients
   - Each ingredient row shows: name, quantity, unit, calories, protein, carbs, fats
   - Make all fields editable with appropriate input types (text, number)
@@ -185,7 +185,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - Display warning if AI confidence < 0.7
   - _Requirements: 1.3, 1.4, 1.5, 1.6, 9.1, 9.2, 9.4_
 
-- [ ] 12. Implement CustomMealsLibraryView for browsing saved meals
+- [x] 12. Implement CustomMealsLibraryView for browsing saved meals
   - Create SwiftUI view with search bar at top
   - Implement real-time search filtering (case-insensitive)
   - Display list of CustomMeals with name, total calories, and macro summary
@@ -201,7 +201,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 20: Custom Meal Search Correctness**
   - **Validates: Requirements 12.1, 12.2**
 
-- [ ] 13. Implement CustomMealDetailView for viewing and adding meals
+- [x] 13. Implement CustomMealDetailView for viewing and adding meals
   - Create SwiftUI view that displays meal name and creation date
   - Show full ingredient list with quantities and units
   - Display total nutritional breakdown (calories, protein, carbs, fats) prominently
@@ -213,7 +213,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - Update lastUsedAt timestamp when meal is added to log
   - _Requirements: 3.2, 3.4, 4.1, 9.1_
 
-- [ ] 14. Implement MacroDisplayView reusable component
+- [x] 14. Implement MacroDisplayView reusable component
   - Create SwiftUI view that displays macro breakdown visually
   - Show horizontal bar chart or circular progress with color-coded sections
   - Use blue for protein, green for carbs, orange for fats
@@ -227,7 +227,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 13: Macro Goal Remaining Calculation**
   - **Validates: Requirements 5.3**
 
-- [ ] 15. Integrate custom meals into main calorie tracking flow
+- [x] 15. Integrate custom meals into main calorie tracking flow
   - Update MainCalorieView to display macro totals alongside calorie totals
   - Add MacroDisplayView component to daily log display
   - Update FoodItemRow to show macro information if available
@@ -241,7 +241,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 14: FoodItem Source Attribution**
   - **Validates: Requirements 8.2**
 
-- [ ] 16. Extend ManualEntryView with macro fields
+- [x] 16. Extend ManualEntryView with macro fields
   - Add optional text fields for protein, carbohydrates, and fats
   - Place macro fields in a separate "Nutritional Details (Optional)" section
   - Use number input with decimal pad keyboard
@@ -250,7 +250,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - Ensure macro fields are optional (can be left empty)
   - _Requirements: 6.3_
 
-- [ ] 17. Update FatSecret API integration to populate macro fields
+- [x] 17. Update FatSecret API integration to populate macro fields
   - Modify NutritionSearchResult to include protein, carbs, and fats fields
   - Parse macro data from FatSecret API responses (servings.serving array)
   - Map macro values to FoodItem when creating from API search result
@@ -265,7 +265,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 16: Custom Meal Ingredient Macro Preservation**
   - **Validates: Requirements 6.4**
 
-- [ ] 18. Implement offline support and network detection
+- [x] 18. Implement offline support and network detection
   - Add network reachability monitoring (use NWPathMonitor)
   - Disable AI parsing UI when offline with tooltip message
   - Ensure all CustomMeal operations work offline (browse, view, add to log)
@@ -277,7 +277,7 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - **Property 19: Offline Custom Meal Access**
   - **Validates: Requirements 11.2, 11.4**
 
-- [ ] 19. Implement comprehensive error handling UI
+- [x] 19. Implement comprehensive error handling UI
   - Add error display components for AI parsing failures
   - Add retry buttons for network errors
   - Add validation error displays with field highlighting

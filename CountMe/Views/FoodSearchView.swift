@@ -15,12 +15,16 @@ import SwiftData
 /// - Loading indicator during API search
 /// - Search results list
 /// - Manual entry button
+/// - Browse custom meals button
 /// - Empty results state handling
 ///
-/// Requirements: 2.1, 2.2
+/// Requirements: 2.1, 2.2, 3.1, 5.1
 struct FoodSearchView: View {
     /// The calorie tracker business logic
     @Bindable var tracker: CalorieTracker
+    
+    /// The custom meal manager for browsing custom meals
+    @Bindable var customMealManager: CustomMealManager
     
     /// Controls dismissal of this view
     @Environment(\.dismiss) private var dismiss
@@ -40,17 +44,28 @@ struct FoodSearchView: View {
     /// Controls navigation to manual entry view
     @State private var showingManualEntry: Bool = false
     
+    /// Controls navigation to custom meals library
+    @State private var showingCustomMeals: Bool = false
+    
     /// The selected search result for serving adjustment
     @State private var selectedResult: NutritionSearchResult?
     
     /// Task for debounced search
     @State private var searchTask: Task<Void, Never>?
     
+    /// Network reachability monitor
+    @State private var networkMonitor = NetworkMonitor()
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Search bar
                 searchBar
+                
+                // Network status warning
+                if !networkMonitor.isConnected {
+                    networkOfflineWarning
+                }
                 
                 // Content area
                 if isSearching {
@@ -75,18 +90,37 @@ struct FoodSearchView: View {
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingManualEntry = true
+                    Menu {
+                        Button {
+                            showingManualEntry = true
+                        } label: {
+                            Label("Manual Entry", systemImage: "pencil.circle")
+                        }
+                        
+                        Button {
+                            showingCustomMeals = true
+                        } label: {
+                            Label("Browse Custom Meals", systemImage: "fork.knife.circle")
+                        }
                     } label: {
-                        Label("Manual Entry", systemImage: "pencil.circle")
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
             .sheet(isPresented: $showingManualEntry) {
                 ManualEntryView(tracker: tracker)
             }
+            .sheet(isPresented: $showingCustomMeals) {
+                CustomMealsLibraryView(manager: customMealManager)
+            }
             .sheet(item: $selectedResult) { result in
                 ServingAdjustmentView(searchResult: result, tracker: tracker)
+            }
+            .onAppear {
+                networkMonitor.start()
+            }
+            .onDisappear {
+                networkMonitor.stop()
             }
         }
     }
@@ -213,7 +247,7 @@ struct FoodSearchView: View {
     
     /// Initial state before any search
     private var initialStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Image(systemName: "fork.knife")
                 .font(.system(size: 48))
                 .foregroundColor(.gray)
@@ -226,6 +260,21 @@ struct FoodSearchView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
+            
+            // Custom meals button
+            Button {
+                showingCustomMeals = true
+            } label: {
+                HStack {
+                    Image(systemName: "fork.knife.circle.fill")
+                    Text("Browse Custom Meals")
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -245,11 +294,39 @@ struct FoodSearchView: View {
         .listStyle(.plain)
     }
     
+    /// Network offline warning
+    private var networkOfflineWarning: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "wifi.slash")
+                .foregroundColor(.orange)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No Internet Connection")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                
+                Text("Food search requires an internet connection. You can still browse custom meals or add items manually.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .background(Color.orange.opacity(0.1))
+    }
+    
     // MARK: - Actions
     
     /// Performs a search using the current query
     private func performSearch() {
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return
+        }
+        
+        // Check network connectivity before searching
+        guard networkMonitor.isConnected else {
+            errorMessage = "No internet connection. Please check your network and try again."
             return
         }
         
@@ -289,16 +366,20 @@ struct FoodSearchView: View {
 #Preview {
     // Create an in-memory model container for preview
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
+    let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self, configurations: config)
     let context = ModelContext(container)
     
+    let dataStore = DataStore(modelContext: context)
     let tracker = CalorieTracker(
-        dataStore: DataStore(modelContext: context),
+        dataStore: dataStore,
         apiClient: NutritionAPIClient(
             consumerKey: "preview",
             consumerSecret: "preview"
         )
     )
     
-    FoodSearchView(tracker: tracker)
+    let aiParser = AIRecipeParser()
+    let customMealManager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
+    
+    FoodSearchView(tracker: tracker, customMealManager: customMealManager)
 }

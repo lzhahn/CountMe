@@ -14,10 +14,12 @@ import SwiftData
 /// - Text field for food name
 /// - Number field for calories
 /// - Optional fields for serving size/unit
-/// - Input validation before saving
+/// - Optional fields for macronutrients (protein, carbohydrates, fats)
+/// - Input validation before saving (non-negative values)
+/// - Inline validation errors for invalid macro values
 /// - Save and cancel actions
 ///
-/// Requirements: 2.3, 8.3
+/// Requirements: 2.3, 6.3, 8.3
 struct ManualEntryView: View {
     /// The calorie tracker business logic
     @Bindable var tracker: CalorieTracker
@@ -37,6 +39,15 @@ struct ManualEntryView: View {
     /// Optional serving unit input
     @State private var servingUnit: String = ""
     
+    /// Optional protein input (grams)
+    @State private var proteinText: String = ""
+    
+    /// Optional carbohydrates input (grams)
+    @State private var carbohydratesText: String = ""
+    
+    /// Optional fats input (grams)
+    @State private var fatsText: String = ""
+    
     /// Validation error message
     @State private var validationError: String?
     
@@ -51,6 +62,9 @@ struct ManualEntryView: View {
         case calories
         case servingSize
         case servingUnit
+        case protein
+        case carbohydrates
+        case fats
     }
     
     var body: some View {
@@ -89,6 +103,40 @@ struct ManualEntryView: View {
                     Text("Optional Information")
                 } footer: {
                     Text("Add serving size details if known")
+                }
+                
+                // Nutritional Details (Optional) section
+                Section {
+                    HStack {
+                        TextField("Protein", text: $proteinText)
+                            .focused($focusedField, equals: .protein)
+                            .keyboardType(.decimalPad)
+                        
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        TextField("Carbohydrates", text: $carbohydratesText)
+                            .focused($focusedField, equals: .carbohydrates)
+                            .keyboardType(.decimalPad)
+                        
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        TextField("Fats", text: $fatsText)
+                            .focused($focusedField, equals: .fats)
+                            .keyboardType(.decimalPad)
+                        
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("Nutritional Details (Optional)")
+                } footer: {
+                    Text("Add macronutrient information if available")
                 }
                 
                 // Validation error display
@@ -173,6 +221,51 @@ struct ManualEntryView: View {
         let trimmedServingUnit = servingUnit.trimmingCharacters(in: .whitespacesAndNewlines)
         let servingUnitValue: String? = trimmedServingUnit.isEmpty ? nil : trimmedServingUnit
         
+        // Validate optional protein if provided
+        let trimmedProtein = proteinText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var proteinValue: Double? = nil
+        if !trimmedProtein.isEmpty {
+            guard let protein = Double(trimmedProtein) else {
+                validationError = "Protein must be a valid number"
+                return
+            }
+            guard protein >= 0 else {
+                validationError = "Protein must be a non-negative number"
+                return
+            }
+            proteinValue = protein
+        }
+        
+        // Validate optional carbohydrates if provided
+        let trimmedCarbs = carbohydratesText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var carbsValue: Double? = nil
+        if !trimmedCarbs.isEmpty {
+            guard let carbs = Double(trimmedCarbs) else {
+                validationError = "Carbohydrates must be a valid number"
+                return
+            }
+            guard carbs >= 0 else {
+                validationError = "Carbohydrates must be a non-negative number"
+                return
+            }
+            carbsValue = carbs
+        }
+        
+        // Validate optional fats if provided
+        let trimmedFats = fatsText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var fatsValue: Double? = nil
+        if !trimmedFats.isEmpty {
+            guard let fats = Double(trimmedFats) else {
+                validationError = "Fats must be a valid number"
+                return
+            }
+            guard fats >= 0 else {
+                validationError = "Fats must be a non-negative number"
+                return
+            }
+            fatsValue = fats
+        }
+        
         // Create and save the food item
         isSaving = true
         
@@ -184,7 +277,10 @@ struct ManualEntryView: View {
                     timestamp: Date(),
                     servingSize: servingSizeValue,
                     servingUnit: servingUnitValue,
-                    source: .manual
+                    source: .manual,
+                    protein: proteinValue,
+                    carbohydrates: carbsValue,
+                    fats: fatsValue
                 )
                 
                 try await tracker.addFoodItem(foodItem)

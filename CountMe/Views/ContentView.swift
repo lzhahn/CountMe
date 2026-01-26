@@ -27,6 +27,9 @@ struct ContentView: View {
     /// The calorie tracker business logic instance
     @State private var tracker: CalorieTracker?
     
+    /// The custom meal manager business logic instance
+    @State private var customMealManager: CustomMealManager?
+    
     /// Loading state during initialization
     @State private var isLoading = true
     
@@ -38,11 +41,11 @@ struct ContentView: View {
             if isLoading {
                 // Loading state during initialization
                 ProgressView("Loading...")
-            } else if let tracker = tracker {
+            } else if let tracker = tracker, let customMealManager = customMealManager {
                 // Main navigation structure
                 TabView {
                     // Main calorie tracking view
-                    MainCalorieView(tracker: tracker)
+                    MainCalorieView(tracker: tracker, customMealManager: customMealManager)
                         .tabItem {
                             Label("Today", systemImage: "house.fill")
                         }
@@ -97,11 +100,20 @@ struct ContentView: View {
             consumerSecret: Config.fatSecretConsumerSecret
         )
         
+        // Initialize AIRecipeParser
+        let aiParser = AIRecipeParser()
+        
         // Create CalorieTracker instance
         let newTracker = CalorieTracker(
             dataStore: dataStore,
             apiClient: apiClient,
             selectedDate: Date()
+        )
+        
+        // Create CustomMealManager instance
+        let newCustomMealManager = CustomMealManager(
+            dataStore: dataStore,
+            aiParser: aiParser
         )
         
         // Load current day's log
@@ -111,6 +123,7 @@ struct ContentView: View {
             // Update state on main actor
             await MainActor.run {
                 tracker = newTracker
+                customMealManager = newCustomMealManager
                 isLoading = false
             }
         } catch {
@@ -119,6 +132,7 @@ struct ContentView: View {
             // Still set tracker even if load fails - user can retry
             await MainActor.run {
                 tracker = newTracker
+                customMealManager = newCustomMealManager
                 isLoading = false
             }
         }
@@ -127,5 +141,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [DailyLog.self, FoodItem.self], inMemory: true)
+        .modelContainer(for: [DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self], inMemory: true)
 }

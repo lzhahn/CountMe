@@ -57,6 +57,21 @@ struct FoodItemRow: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    
+                    // Macro information if available
+                    if hasMacros {
+                        HStack(spacing: 8) {
+                            if let protein = item.protein {
+                                macroLabel(value: protein, label: "P", color: .blue)
+                            }
+                            if let carbs = item.carbohydrates {
+                                macroLabel(value: carbs, label: "C", color: .green)
+                            }
+                            if let fats = item.fats {
+                                macroLabel(value: fats, label: "F", color: .orange)
+                            }
+                        }
+                    }
                 }
                 
                 Spacer()
@@ -98,6 +113,11 @@ struct FoodItemRow: View {
         }
     }
     
+    /// Whether the item has any macro information
+    private var hasMacros: Bool {
+        item.protein != nil || item.carbohydrates != nil || item.fats != nil
+    }
+    
     /// Relative timestamp string (e.g., "2 hours ago", "Just now")
     private var relativeTimestamp: String {
         let now = Date()
@@ -124,6 +144,25 @@ struct FoodItemRow: View {
         let days = Int(interval / 86400)
         return "\(days) day\(days == 1 ? "" : "s") ago"
     }
+    
+    // MARK: - Helper Views
+    
+    /// Creates a compact macro label with value and abbreviation
+    private func macroLabel(value: Double, label: String, color: Color) -> some View {
+        HStack(spacing: 2) {
+            Text("\(Int(value))")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(color)
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.1))
+        .cornerRadius(4)
+    }
 }
 
 // MARK: - Preview
@@ -137,7 +176,10 @@ struct FoodItemRow: View {
                 timestamp: Date().addingTimeInterval(-3600),
                 servingSize: "100",
                 servingUnit: "g",
-                source: .api
+                source: .api,
+                protein: 31,
+                carbohydrates: 0,
+                fats: 3.6
             ),
             onDelete: {},
             onEdit: {}
@@ -156,12 +198,15 @@ struct FoodItemRow: View {
         
         FoodItemRow(
             item: FoodItem(
-                name: "Oatmeal",
-                calories: 150,
+                name: "Chicken Stir Fry",
+                calories: 424,
                 timestamp: Date().addingTimeInterval(-7200),
                 servingSize: "1",
-                servingUnit: "cup",
-                source: .manual
+                servingUnit: "serving",
+                source: .customMeal,
+                protein: 41.5,
+                carbohydrates: 51,
+                fats: 4.7
             ),
             onDelete: {},
             onEdit: {}

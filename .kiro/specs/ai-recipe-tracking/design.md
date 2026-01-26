@@ -14,6 +14,11 @@ Key capabilities include:
 - Offline access to saved custom meals
 - Search and filtering of custom meal library
 
+**Related Documentation:**
+- [API Documentation](api-documentation.md) - Comprehensive API reference with usage examples
+- [Requirements Document](requirements.md) - User stories and acceptance criteria
+- [Tasks Document](tasks.md) - Implementation plan and testing strategy
+
 ## Architecture
 
 ### High-Level Architecture
