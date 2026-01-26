@@ -31,6 +31,9 @@ struct CustomMealDetailView: View {
     /// The custom meal manager business logic
     @Bindable var manager: CustomMealManager
     
+    /// Optional callback to dismiss the entire sheet stack
+    var onDismissAll: (() -> Void)? = nil
+    
     /// SwiftData model context for fetching/creating daily logs
     @Environment(\.modelContext) private var modelContext
     
@@ -398,16 +401,15 @@ struct CustomMealDetailView: View {
                     log: log
                 )
                 
-                // Show success toast
-                toastMessage = "Added \(meal.name) to today's log"
-                toastStyle = .success
-                withAnimation {
-                    showingToast = true
-                }
-                
-                // Dismiss after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    dismiss()
+                // Dismiss the entire sheet stack to return to main page
+                await MainActor.run {
+                    if let onDismissAll = onDismissAll {
+                        // Use callback to dismiss entire sheet stack
+                        onDismissAll()
+                    } else {
+                        // Fallback to just dismissing this view
+                        dismiss()
+                    }
                 }
             } catch {
                 // Show error toast
@@ -474,8 +476,12 @@ struct CustomMealDetailView: View {
         lastUsedAt: Date().addingTimeInterval(-3600)
     )
     
-    return NavigationStack {
-        CustomMealDetailView(meal: sampleMeal, manager: manager)
+    NavigationStack {
+        CustomMealDetailView(
+            meal: sampleMeal,
+            manager: manager,
+            onDismissAll: nil
+        )
             .modelContainer(container)
     }
 }

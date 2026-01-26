@@ -33,41 +33,52 @@ struct MainCalorieView: View {
     /// Controls navigation to goal setting view
     @State private var showingGoalSetting = false
     
+    /// Controls navigation to custom meals library
+    @State private var showingCustomMeals = false
+    
+    /// Controls navigation to recipe input (AI meal creation)
+    @State private var showingRecipeInput = false
+    
+    /// The saved meal to show in detail view
+    @State private var savedMealToShow: CustomMeal?
+    
+    /// Controls navigation to manual entry
+    @State private var showingManualEntry = false
+    
+    /// Controls the add menu visibility
+    @State private var showingAddMenu = false
+    
     /// The food item currently being edited
     @State private var editingItem: FoodItem?
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // Daily total and progress section
-                dailyTotalSection
-                
-                // Macro breakdown section
-                if let log = tracker.currentLog {
-                    MacroDisplayView(
-                        protein: log.totalProtein,
-                        carbohydrates: log.totalCarbohydrates,
-                        fats: log.totalFats
-                    )
+            ZStack(alignment: .bottomTrailing) {
+                VStack(spacing: 20) {
+                    // Daily total and progress section
+                    dailyTotalSection
+                    
+                    // Macro breakdown section
+                    if let log = tracker.currentLog {
+                        MacroDisplayView(
+                            protein: log.totalProtein,
+                            carbohydrates: log.totalCarbohydrates,
+                            fats: log.totalFats
+                        )
+                    }
+                    
+                    // Food items list
+                    foodItemsList
+                    
+                    Spacer()
                 }
+                .padding()
                 
-                // Food items list
-                foodItemsList
-                
-                Spacer()
+                // Floating action button
+                floatingActionButton
             }
-            .padding()
             .navigationTitle("Today")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingFoodSearch = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                    }
-                }
-                
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showingGoalSetting = true
@@ -82,6 +93,44 @@ struct MainCalorieView: View {
             }
             .sheet(isPresented: $showingGoalSetting) {
                 GoalSettingView(tracker: tracker)
+            }
+            .sheet(isPresented: $showingCustomMeals) {
+                CustomMealsLibraryView(
+                    manager: customMealManager,
+                    onDismissAll: {
+                        // Dismiss the entire custom meals sheet
+                        showingCustomMeals = false
+                    }
+                )
+            }
+            .sheet(isPresented: $showingRecipeInput) {
+                RecipeInputView(
+                    manager: customMealManager,
+                    onDismiss: { savedMeal in
+                        showingRecipeInput = false
+                        // Show the saved meal detail after a brief delay
+                        if let meal = savedMeal {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                savedMealToShow = meal
+                            }
+                        }
+                    }
+                )
+            }
+            .sheet(item: $savedMealToShow) { meal in
+                NavigationStack {
+                    CustomMealDetailView(
+                        meal: meal,
+                        manager: customMealManager,
+                        onDismissAll: {
+                            // Dismiss the sheet
+                            savedMealToShow = nil
+                        }
+                    )
+                }
+            }
+            .sheet(isPresented: $showingManualEntry) {
+                ManualEntryView(tracker: tracker)
             }
             .sheet(item: $editingItem) { item in
                 // TODO: Replace with ManualEntryView when implemented
@@ -110,6 +159,65 @@ struct MainCalorieView: View {
     
     // MARK: - View Components
     
+    /// Floating action button with add menu
+    private var floatingActionButton: some View {
+        VStack(spacing: 16) {
+            if showingAddMenu {
+                VStack(spacing: 12) {
+                    // Search food option
+                    FloatingMenuButton(
+                        icon: "magnifyingglass",
+                        title: "Search Food",
+                        color: .blue
+                    ) {
+                        showingAddMenu = false
+                        showingFoodSearch = true
+                    }
+                    
+                    // AI Meal option
+                    FloatingMenuButton(
+                        icon: "sparkles",
+                        title: "AI Meal",
+                        color: .orange
+                    ) {
+                        showingAddMenu = false
+                        showingRecipeInput = true
+                    }
+                    
+                    // Manual entry option
+                    FloatingMenuButton(
+                        icon: "pencil.circle",
+                        title: "Manual Entry",
+                        color: .green
+                    ) {
+                        showingAddMenu = false
+                        showingManualEntry = true
+                    }
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
+            
+            // Main FAB button
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    showingAddMenu.toggle()
+                }
+            } label: {
+                Image(systemName: showingAddMenu ? "xmark" : "plus")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(width: 60, height: 60)
+                    .background(Color.blue)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .rotationEffect(.degrees(showingAddMenu ? 45 : 0))
+            }
+        }
+        .padding(.trailing, 20)
+        .padding(.bottom, 20)
+    }
+    
     /// Daily total and progress indicator section
     private var dailyTotalSection: some View {
         VStack(spacing: 16) {
@@ -117,28 +225,28 @@ struct MainCalorieView: View {
             ZStack {
                 // Background circle
                 Circle()
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 20)
-                    .frame(width: 200, height: 200)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 16)
+                    .frame(width: 160, height: 160)
                 
                 // Progress circle
                 Circle()
                     .trim(from: 0, to: progressPercentage)
                     .stroke(
                         progressColor,
-                        style: StrokeStyle(lineWidth: 20, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 16, lineCap: .round)
                     )
-                    .frame(width: 200, height: 200)
+                    .frame(width: 160, height: 160)
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut, value: progressPercentage)
                 
                 // Calorie count in center
                 VStack(spacing: 4) {
                     Text("\(Int(currentTotal))")
-                        .font(.system(size: 48, weight: .bold))
+                        .font(.system(size: 40, weight: .bold))
                         .foregroundColor(progressColor)
                     
                     Text("calories")
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
@@ -251,6 +359,40 @@ struct MainCalorieView: View {
         } else {
             return .green // On track
         }
+    }
+}
+
+// MARK: - Floating Menu Button Component
+
+/// Individual button in the floating action menu
+struct FloatingMenuButton: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .background(color)
+                    .clipShape(Circle())
+                
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(22)
+                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

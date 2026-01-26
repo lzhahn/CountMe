@@ -25,6 +25,9 @@ struct CustomMealsLibraryView: View {
     /// The custom meal manager business logic
     @Bindable var manager: CustomMealManager
     
+    /// Optional callback to dismiss the entire sheet stack
+    var onDismissAll: (() -> Void)? = nil
+    
     /// Controls dismissal of this view
     @Environment(\.dismiss) private var dismiss
     
@@ -309,7 +312,11 @@ struct CustomMealsLibraryView: View {
         List {
             ForEach(filteredMeals) { meal in
                 NavigationLink {
-                    CustomMealDetailView(meal: meal, manager: manager)
+                    CustomMealDetailView(
+                        meal: meal,
+                        manager: manager,
+                        onDismissAll: onDismissAll
+                    )
                 } label: {
                     CustomMealRow(meal: meal)
                 }
@@ -512,5 +519,5 @@ struct CustomMealRow: View {
     
     manager.savedMeals = [sampleMeal1, sampleMeal2]
     
-    return CustomMealsLibraryView(manager: manager)
+    return CustomMealsLibraryView(manager: manager, onDismissAll: nil)
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os.log
 
 /// Errors that can occur during AI recipe parsing
 enum AIParserError: Error, LocalizedError {
@@ -54,9 +55,7 @@ actor AIRecipeParser {
     private let session: URLSession
     private let endpoint: URL
     private let modelName: String
-    
-    // Allowed units for ingredient quantities
-    private let allowedUnits = ["cup", "tbsp", "tsp", "oz", "lb", "gram", "kg", "piece", "serving"]
+    private let logger = Logger(subsystem: "com.halu.CountMe", category: "AIRecipeParser")
     
     /// Initializes the AI recipe parser
     /// - Parameters:
@@ -65,10 +64,10 @@ actor AIRecipeParser {
     ///   - session: URLSession for network requests (defaults to configured session with 30s timeout)
     init(
         endpoint: URL? = nil,
-        modelName: String = "gpt-oss:20b",
+        modelName: String = "gemma3:27b",
         session: URLSession? = nil
     ) {
-        self.endpoint = endpoint ?? URL(string: "http://localhost:11434/api/chat")!
+        self.endpoint = endpoint ?? URL(string: "http://localhost:11434/api/generate")!
         self.modelName = modelName
         
         // Configure session with 30-second timeout if not provided
@@ -170,6 +169,11 @@ actor AIRecipeParser {
     
     /// Performs the actual AI parsing request
     private func performParsing(_ description: String) async throws -> ParsedRecipe {
+        logger.info("=== STARTING AI RECIPE PARSING ===")
+        logger.info("Recipe description: \(description)")
+        logger.info("Endpoint: \(self.endpoint.absoluteString)")
+        logger.info("Model: \(self.modelName)")
+        
         // Build the request
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -178,13 +182,14 @@ actor AIRecipeParser {
         // Build the prompt
         let prompt = buildPrompt(for: description)
         
-        // Build request body for Ollama API
+        logger.debug("=== PROMPT ===")
+        logger.debug("\(prompt)")
+        logger.debug("=== END PROMPT ===")
+        
+        // Build request body for Ollama generate API
         let requestBody: [String: Any] = [
             "model": modelName,
-            "messages": [
-                ["role": "system", "content": "You are a nutrition data extraction assistant."],
-                ["role": "user", "content": prompt]
-            ],
+            "prompt": prompt,
             "stream": false,
             "options": [
                 "temperature": 0.3,
@@ -194,13 +199,25 @@ actor AIRecipeParser {
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
+        if let requestData = request.httpBody,
+           let requestString = String(data: requestData, encoding: .utf8) {
+            logger.debug("=== REQUEST BODY ===")
+            logger.debug("\(requestString)")
+            logger.debug("=== END REQUEST BODY ===")
+        }
+        
         // Make the request
         let data: Data
         let response: URLResponse
         
+        logger.info("🌐 Making request to Ollama...")
+        
         do {
             (data, response) = try await session.data(for: request)
+            logger.info("✅ Request completed successfully - Response size: \(data.count) bytes")
         } catch let error as NSError {
+            logger.error("❌ ERROR: Network request failed - \(error.localizedDescription) (Code: \(error.code), Domain: \(error.domain))")
+            
             // Handle timeout errors specifically
             if error.code == NSURLErrorTimedOut {
                 throw AIParserError.timeout
@@ -210,10 +227,17 @@ actor AIRecipeParser {
         
         // Check HTTP response
         guard let httpResponse = response as? HTTPURLResponse else {
+            logger.error("❌ ERROR: Response is not HTTPURLResponse")
             throw AIParserError.invalidResponse
         }
         
+        logger.info("📊 HTTP Status: \(httpResponse.statusCode)")
+        
         guard (200...299).contains(httpResponse.statusCode) else {
+            logger.error("❌ ERROR: HTTP status code indicates failure: \(httpResponse.statusCode)")
+            if let errorString = String(data: data, encoding: .utf8) {
+                logger.error("Error response body: \(errorString)")
+            }
             throw AIParserError.invalidResponse
         }
         
@@ -242,7 +266,7 @@ actor AIRecipeParser {
             {
               "name": "string (required, non-empty)",
               "quantity": number (required, positive),
-              "unit": "string (required, one of: cup, tbsp, tsp, oz, lb, gram, kg, piece, serving)",
+              "unit": "string (required, one of: cup, tbsp, tsp, oz, lb, gram, kg, piece, serving, stalk, clove, bunch, slice, can, jar, bottle, package, or any other common unit)",
               "calories": number (required, positive),
               "protein": number (optional, grams),
               "carbohydrates": number (optional, grams),
@@ -297,18 +321,46 @@ actor AIRecipeParser {
     
     /// Parses the AI service response into a ParsedRecipe
     private func parseAIResponse(_ data: Data) throws -> ParsedRecipe {
+        // Log the raw response data
+        if let rawString = String(data: data, encoding: .utf8) {
+            logger.debug("=== RAW OLLAMA RESPONSE ===")
+            logger.debug("\(rawString)")
+            logger.debug("=== END RAW RESPONSE ===")
+        }
+        
         // Parse Ollama response wrapper
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let message = json["message"] as? [String: Any],
-              let content = message["content"] as? String else {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            logger.error("❌ ERROR: Failed to parse response as JSON")
             throw AIParserError.invalidResponse
         }
+        
+        // Log the parsed JSON structure
+        if let prettyData = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted),
+           let prettyString = String(data: prettyData, encoding: .utf8) {
+            logger.debug("=== PARSED OLLAMA JSON ===")
+            logger.debug("\(prettyString)")
+            logger.debug("=== END PARSED JSON ===")
+        }
+        
+        guard let content = json["response"] as? String else {
+            logger.error("❌ ERROR: No 'response' field in JSON. Available keys: \(json.keys.joined(separator: ", "))")
+            throw AIParserError.invalidResponse
+        }
+        
+        logger.debug("=== EXTRACTED CONTENT ===")
+        logger.debug("\(content)")
+        logger.debug("=== END CONTENT ===")
         
         // Extract JSON from content (handle markdown blocks)
         let jsonString = extractJSON(from: content)
         
+        logger.debug("=== CLEANED JSON STRING ===")
+        logger.debug("\(jsonString)")
+        logger.debug("=== END CLEANED JSON ===")
+        
         // Parse the recipe JSON
         guard let jsonData = jsonString.data(using: .utf8) else {
+            logger.error("❌ ERROR: Failed to convert cleaned JSON string to data")
             throw AIParserError.parsingFailed
         }
         
@@ -351,7 +403,23 @@ actor AIRecipeParser {
         let response: RecipeParseResponse
         do {
             response = try decoder.decode(RecipeParseResponse.self, from: data)
+            logger.info("✅ Successfully decoded RecipeParseResponse - Ingredients: \(response.ingredients.count), Confidence: \(response.confidence)")
         } catch {
+            logger.error("❌ ERROR: Failed to decode RecipeParseResponse - \(error.localizedDescription)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    logger.error("Missing key: \(key.stringValue) - \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    logger.error("Type mismatch: expected \(String(describing: type)) - \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    logger.error("Value not found: \(String(describing: type)) - \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    logger.error("Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    logger.error("Unknown decoding error")
+                }
+            }
             throw AIParserError.parsingFailed
         }
         
@@ -399,6 +467,11 @@ actor AIRecipeParser {
             throw AIParserError.insufficientData
         }
         
+        // Validate unit is not empty
+        guard !ingredient.unit.isEmpty else {
+            throw AIParserError.invalidResponse
+        }
+        
         // Validate quantity
         guard ingredient.quantity > 0 else {
             throw AIParserError.invalidResponse
@@ -417,11 +490,6 @@ actor AIRecipeParser {
             throw AIParserError.invalidResponse
         }
         if let fats = ingredient.fats, fats < 0 {
-            throw AIParserError.invalidResponse
-        }
-        
-        // Validate unit is from allowed list
-        guard allowedUnits.contains(ingredient.unit.lowercased()) else {
             throw AIParserError.invalidResponse
         }
     }

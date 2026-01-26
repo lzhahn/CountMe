@@ -28,6 +28,9 @@ struct RecipeInputView: View {
     /// Controls dismissal of this view
     @Environment(\.dismiss) private var dismiss
     
+    /// Callback to dismiss the entire sheet stack and optionally show a meal detail
+    var onDismiss: ((CustomMeal?) -> Void)? = nil
+    
     /// Recipe description input
     @State private var recipeDescription: String = ""
     
@@ -136,7 +139,12 @@ struct RecipeInputView: View {
             .navigationDestination(item: $parsedRecipe) { recipe in
                 IngredientReviewView(
                     manager: manager,
-                    parsedRecipe: recipe
+                    parsedRecipe: recipe,
+                    onDismissAll: { savedMeal in
+                        // Dismiss the entire sheet stack and pass the saved meal
+                        onDismiss?(savedMeal)
+                        dismiss()
+                    }
                 )
             }
             .sheet(isPresented: $showingManualEntry) {
@@ -405,11 +413,14 @@ struct IngredientReviewView: View {
     
     @Environment(\.dismiss) private var dismiss
     
+    /// Callback to dismiss the entire sheet stack with the saved meal
+    var onDismissAll: ((CustomMeal?) -> Void)? = nil
+    
     /// Editable ingredients list
     @State private var ingredients: [EditableIngredient] = []
     
-    /// Controls meal name prompt alert
-    @State private var showingSaveAlert = false
+    /// Controls meal name prompt sheet
+    @State private var showingSaveSheet = false
     
     /// Meal name input
     @State private var mealName = ""
@@ -458,23 +469,20 @@ struct IngredientReviewView: View {
                 .disabled(manager.isLoading)
             }
         }
-        .alert("Save Custom Meal", isPresented: $showingSaveAlert) {
-            TextField("Meal Name", text: $mealName)
-            
-            Button("Cancel", role: .cancel) {
-                mealName = ""
-                mealNameError = nil
-            }
-            
-            Button("Save") {
-                saveMeal()
-            }
-        } message: {
-            if let error = mealNameError {
-                Text(error)
-            } else {
-                Text("Enter a name for this custom meal")
-            }
+        .sheet(isPresented: $showingSaveSheet) {
+            SaveMealNameSheet(
+                mealName: $mealName,
+                errorMessage: $mealNameError,
+                onSave: { name in
+                    mealName = name
+                    saveMeal()
+                },
+                onCancel: {
+                    mealName = ""
+                    mealNameError = nil
+                    showingSaveSheet = false
+                }
+            )
         }
         .toast(
             isPresented: $showingToast,
@@ -623,7 +631,7 @@ struct IngredientReviewView: View {
         VStack(spacing: 12) {
             // Save button
             Button {
-                showingSaveAlert = true
+                showingSaveSheet = true
             } label: {
                 HStack {
                     if manager.isLoading {
@@ -701,7 +709,6 @@ struct IngredientReviewView: View {
         let trimmedName = mealName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             mealNameError = "Meal name cannot be empty"
-            showingSaveAlert = true
             return
         }
         
@@ -711,31 +718,30 @@ struct IngredientReviewView: View {
         // Ensure we have valid ingredients
         guard ingredientModels.count == ingredients.count else {
             mealNameError = "Some ingredients have invalid data"
-            showingSaveAlert = true
             return
         }
         
         Task {
             do {
-                _ = try await manager.saveCustomMeal(name: trimmedName, ingredients: ingredientModels)
+                let savedMeal = try await manager.saveCustomMeal(name: trimmedName, ingredients: ingredientModels)
                 
                 await MainActor.run {
+                    // Close the sheet
+                    showingSaveSheet = false
                     mealName = ""
                     mealNameError = nil
-                    toastMessage = "Custom meal '\(trimmedName)' saved successfully!"
-                    toastStyle = .success
-                    showingToast = true
                     
-                    // Dismiss after toast is shown
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    // Dismiss the entire sheet stack and pass the saved meal
+                    if let onDismissAll = onDismissAll {
+                        onDismissAll(savedMeal)
+                    } else {
+                        // Otherwise just dismiss this view
                         dismiss()
                     }
                 }
             } catch {
-                // Error is captured in manager.errorMessage
                 await MainActor.run {
                     mealNameError = manager.errorMessage ?? "Failed to save meal"
-                    showingSaveAlert = true
                 }
             }
         }
@@ -1094,6 +1100,69 @@ struct ManualIngredientEntryView: View {
                     }
                 }
         }
+    }
+}
+
+// MARK: - Save Meal Name Sheet
+
+/// Sheet for entering the custom meal name
+struct SaveMealNameSheet: View {
+    @Binding var mealName: String
+    @Binding var errorMessage: String?
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+    
+    @FocusState private var isTextFieldFocused: Bool
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Enter a name for this custom meal")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .padding(.top)
+                
+                TextField("Meal Name", text: $mealName)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isTextFieldFocused)
+                    .padding(.horizontal)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        if !mealName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            onSave(mealName)
+                        }
+                    }
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(.horizontal)
+                }
+                
+                Spacer()
+            }
+            .navigationTitle("Save Custom Meal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(mealName)
+                    }
+                    .disabled(mealName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                isTextFieldFocused = true
+            }
+        }
+        .presentationDetents([.height(200)])
     }
 }
 

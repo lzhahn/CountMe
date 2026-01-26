@@ -28,6 +28,7 @@ final class CustomMeal {
     var name: String
     
     /// List of ingredients that make up this meal
+    @Relationship(deleteRule: .cascade)
     var ingredients: [Ingredient]
     
     /// Timestamp when the meal was first created

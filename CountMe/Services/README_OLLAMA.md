@@ -19,7 +19,7 @@ The AIRecipeParser uses Ollama for local AI-powered recipe parsing. This provide
    ```bash
    ollama serve
    ```
-   The server runs on `http://localhost:11434` by default.
+   The server runs on `http://localhost:11434` by default. The parser uses the `/api/generate` endpoint.
 
 ## Usage
 
@@ -36,7 +36,7 @@ You can customize the endpoint and model:
 
 ```swift
 let parser = AIRecipeParser(
-    endpoint: URL(string: "http://localhost:11434/api/chat")!,
+    endpoint: URL(string: "http://localhost:11434/api/generate")!,
     modelName: "llama3.2"
 )
 ```
