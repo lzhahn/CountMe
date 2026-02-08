@@ -13,10 +13,10 @@ import SwiftUI
 /// - Food name
 /// - Calorie count
 /// - Timestamp formatted as relative time
-/// - Swipe-to-delete action
-/// - Tap gesture for editing
+/// - Swipe-to-delete action (disabled in selection mode)
+/// - Tap gesture for editing (disabled in selection mode)
 ///
-/// Requirements: 5.1, 5.2
+/// Requirements: 5.1, 5.2, 14.1, 14.2
 struct FoodItemRow: View {
     /// The food item to display
     let item: FoodItem
@@ -27,8 +27,11 @@ struct FoodItemRow: View {
     /// Callback when the item should be edited
     let onEdit: () -> Void
     
+    /// Whether the row is in selection mode (disables edit/delete actions)
+    var isSelectionMode: Bool = false
+    
     var body: some View {
-        Button(action: onEdit) {
+        Button(action: isSelectionMode ? {} : onEdit) {
             HStack(spacing: 12) {
                 // Food icon
                 Image(systemName: foodIcon)
@@ -92,11 +95,7 @@ struct FoodItemRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
-            }
-        }
+        .disabled(isSelectionMode)
     }
     
     // MARK: - Computed Properties

@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-/// Manual food entry view that allows users to add food items without API search
+/// Manual food entry view that allows users to add or edit food items without API search
 ///
 /// This view provides:
 /// - Text field for food name
@@ -18,11 +18,15 @@ import SwiftData
 /// - Input validation before saving (non-negative values)
 /// - Inline validation errors for invalid macro values
 /// - Save and cancel actions
+/// - Edit mode for existing food items
 ///
 /// Requirements: 2.3, 6.3, 8.3
 struct ManualEntryView: View {
     /// The calorie tracker business logic
     @Bindable var tracker: CalorieTracker
+    
+    /// Optional food item to edit (nil for new entry)
+    var editingItem: FoodItem?
     
     /// Controls dismissal of this view
     @Environment(\.dismiss) private var dismiss
@@ -65,6 +69,24 @@ struct ManualEntryView: View {
         case protein
         case carbohydrates
         case fats
+    }
+    
+    // MARK: - Initialization
+    
+    init(tracker: CalorieTracker, editingItem: FoodItem? = nil) {
+        self.tracker = tracker
+        self.editingItem = editingItem
+        
+        // Pre-populate fields if editing
+        if let item = editingItem {
+            _foodName = State(initialValue: item.name)
+            _caloriesText = State(initialValue: String(format: "%.0f", item.calories))
+            _servingSize = State(initialValue: item.servingSize ?? "")
+            _servingUnit = State(initialValue: item.servingUnit ?? "")
+            _proteinText = State(initialValue: item.protein.map { String(format: "%.1f", $0) } ?? "")
+            _carbohydratesText = State(initialValue: item.carbohydrates.map { String(format: "%.1f", $0) } ?? "")
+            _fatsText = State(initialValue: item.fats.map { String(format: "%.1f", $0) } ?? "")
+        }
     }
     
     var body: some View {
@@ -152,7 +174,7 @@ struct ManualEntryView: View {
                     }
                 }
             }
-            .navigationTitle("Add Food Manually")
+            .navigationTitle(editingItem == nil ? "Add Food Manually" : "Edit Food")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -266,24 +288,40 @@ struct ManualEntryView: View {
             fatsValue = fats
         }
         
-        // Create and save the food item
+        // Create or update the food item
         isSaving = true
         
         Task {
             do {
-                let foodItem = FoodItem(
-                    name: trimmedName,
-                    calories: calories,
-                    timestamp: Date(),
-                    servingSize: servingSizeValue,
-                    servingUnit: servingUnitValue,
-                    source: .manual,
-                    protein: proteinValue,
-                    carbohydrates: carbsValue,
-                    fats: fatsValue
-                )
-                
-                try await tracker.addFoodItem(foodItem)
+                if let existingItem = editingItem {
+                    // Update existing item
+                    existingItem.name = trimmedName
+                    existingItem.calories = calories
+                    existingItem.servingSize = servingSizeValue
+                    existingItem.servingUnit = servingUnitValue
+                    existingItem.protein = proteinValue
+                    existingItem.carbohydrates = carbsValue
+                    existingItem.fats = fatsValue
+                    existingItem.lastModified = Date()
+                    existingItem.syncStatus = .pendingUpload
+                    
+                    try await tracker.updateFoodItem(existingItem)
+                } else {
+                    // Create new item
+                    let foodItem = FoodItem(
+                        name: trimmedName,
+                        calories: calories,
+                        timestamp: Date(),
+                        servingSize: servingSizeValue,
+                        servingUnit: servingUnitValue,
+                        source: .manual,
+                        protein: proteinValue,
+                        carbohydrates: carbsValue,
+                        fats: fatsValue
+                    )
+                    
+                    try await tracker.addFoodItem(foodItem)
+                }
                 
                 // Navigate back on success
                 await MainActor.run {

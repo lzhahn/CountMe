@@ -41,7 +41,7 @@ This plan outlines the step-by-step refactoring of the CountMe iOS application's
     - _Requirements: 1.2, 1.3, 4.1_
   
   - [x] 3.2 Verify build success after moving views
-    - Run `xcodebuild -scheme CountMe -destination 'platform=iOS Simulator,name=iPhone 15' clean build`
+    - Run `xcodebuild -scheme CountMe -destination 'platform=iOS Simulator,name=iPhone 17' clean build`
     - Verify no compilation errors
     - Check for any warnings related to file moves
     - _Requirements: 1.4, 6.1, 10.1_
@@ -65,7 +65,7 @@ This plan outlines the step-by-step refactoring of the CountMe iOS application's
     - _Requirements: 2.2, 2.3, 4.1_
   
   - [x] 4.2 Verify build success after moving services
-    - Run `xcodebuild -scheme CountMe -destination 'platform=iOS Simulator,name=iPhone 15' clean build`
+    - Run `xcodebuild -scheme CountMe -destination 'platform=iOS Simulator,name=iPhone 17' clean build`
     - Verify no compilation errors
     - Check for any warnings related to file moves
     - _Requirements: 2.4, 6.1, 10.1_
@@ -84,7 +84,7 @@ This plan outlines the step-by-step refactoring of the CountMe iOS application's
     - _Requirements: 3.2, 3.3, 4.1_
   
   - [x] 5.2 Verify build success after moving utilities
-    - Run `xcodebuild -scheme CountMe -destination 'platform=iOS Simulator,name=iPhone 15' clean build`
+    - Run `xcodebuild -scheme CountMe -destination 'platform=iOS Simulator,name=iPhone 17' clean build`
     - Verify no compilation errors
     - Check for any warnings related to file moves
     - _Requirements: 6.1, 10.1_

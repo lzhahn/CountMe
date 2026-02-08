@@ -7,10 +7,11 @@
 
 import Foundation
 import SwiftData
+import FirebaseFirestore
 
 @Model
-final class FoodItem {
-    var id: UUID
+final class FoodItem: SyncableEntity {
+    var _id: UUID
     var name: String
     var calories: Double
     var timestamp: Date
@@ -23,6 +24,19 @@ final class FoodItem {
     var carbohydrates: Double?
     var fats: Double?
     
+    // Relationship to DailyLog
+    var dailyLog: DailyLog?
+    
+    // SyncableEntity properties
+    var userId: String = ""
+    var lastModified: Date = Date()
+    var syncStatus: SyncStatus = SyncStatus.pendingUpload
+    
+    /// String representation of the UUID for SyncableEntity conformance
+    var id: String {
+        _id.uuidString
+    }
+    
     init(
         id: UUID = UUID(),
         name: String,
@@ -33,9 +47,12 @@ final class FoodItem {
         source: FoodItemSource = .manual,
         protein: Double? = nil,
         carbohydrates: Double? = nil,
-        fats: Double? = nil
+        fats: Double? = nil,
+        userId: String = "",
+        lastModified: Date = Date(),
+        syncStatus: SyncStatus = .pendingUpload
     ) {
-        self.id = id
+        self._id = id
         self.name = name
         self.calories = calories
         self.timestamp = timestamp
@@ -45,5 +62,143 @@ final class FoodItem {
         self.protein = protein
         self.carbohydrates = carbohydrates
         self.fats = fats
+        self.userId = userId
+        self.lastModified = lastModified
+        self.syncStatus = syncStatus
+    }
+}
+
+// MARK: - SyncableEntity Conformance
+
+extension FoodItem {
+    /// Converts the food item to a Firestore-compatible dictionary
+    ///
+    /// Serializes all properties including nutritional data, serving information,
+    /// and sync metadata for cloud storage.
+    ///
+    /// - Returns: Dictionary with all food item data in Firestore-compatible format
+    func toFirestoreData() -> [String: Any] {
+        var data: [String: Any] = [
+            "id": _id.uuidString,
+            "name": name,
+            "calories": calories,
+            "timestamp": Timestamp(date: timestamp),
+            "source": source.rawValue,
+            "userId": userId,
+            "lastModified": Timestamp(date: lastModified),
+            "syncStatus": syncStatus.rawValue
+        ]
+        
+        // Add optional fields only if they have values
+        if let servingSize = servingSize {
+            data["servingSize"] = servingSize
+        }
+        if let servingUnit = servingUnit {
+            data["servingUnit"] = servingUnit
+        }
+        if let protein = protein {
+            data["protein"] = protein
+        }
+        if let carbohydrates = carbohydrates {
+            data["carbohydrates"] = carbohydrates
+        }
+        if let fats = fats {
+            data["fats"] = fats
+        }
+        
+        return data
+    }
+    
+    /// Creates a FoodItem instance from Firestore data
+    ///
+    /// Deserializes a Firestore document into a fully-formed FoodItem instance.
+    /// Handles both required and optional fields with appropriate validation.
+    ///
+    /// - Parameter data: Dictionary containing Firestore document data
+    /// - Returns: Fully initialized FoodItem instance
+    /// - Throws: SyncError.invalidFirestoreData if required fields are missing or invalid
+    static func fromFirestoreData(_ data: [String: Any]) throws -> FoodItem {
+        // Extract required fields
+        guard let idString = data["id"] as? String,
+              let id = UUID(uuidString: idString),
+              let name = data["name"] as? String,
+              let calories = data["calories"] as? Double,
+              let timestamp = (data["timestamp"] as? Timestamp)?.dateValue(),
+              let sourceRaw = data["source"] as? String,
+              let source = FoodItemSource(rawValue: sourceRaw),
+              let userId = data["userId"] as? String,
+              let lastModified = (data["lastModified"] as? Timestamp)?.dateValue(),
+              let syncStatusRaw = data["syncStatus"] as? String,
+              let syncStatus = SyncStatus(rawValue: syncStatusRaw)
+        else {
+            throw SyncError.invalidFirestoreData
+        }
+        
+        // Extract optional fields
+        let servingSize = data["servingSize"] as? String
+        let servingUnit = data["servingUnit"] as? String
+        let protein = data["protein"] as? Double
+        let carbohydrates = data["carbohydrates"] as? Double
+        let fats = data["fats"] as? Double
+        
+        return FoodItem(
+            id: id,
+            name: name,
+            calories: calories,
+            timestamp: timestamp,
+            servingSize: servingSize,
+            servingUnit: servingUnit,
+            source: source,
+            protein: protein,
+            carbohydrates: carbohydrates,
+            fats: fats,
+            userId: userId,
+            lastModified: lastModified,
+            syncStatus: syncStatus
+        )
+    }
+}
+
+// MARK: - SyncError
+
+/// Errors that can occur during synchronization operations
+enum SyncError: LocalizedError {
+    case invalidFirestoreData
+    case notAuthenticated
+    case networkUnavailable
+    case firestoreError(Error)
+    case dataStoreError(Error)
+    case conflictResolutionFailed
+    case migrationFailed(reason: String)
+    case queueProcessingFailed(count: Int)
+    case maxRetriesExceeded(operationId: String, attempts: Int)
+    case invalidData(reason: String)
+    case accountDeletionFailed(reason: String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidFirestoreData:
+            return "Invalid data format from cloud"
+        case .notAuthenticated:
+            return "You must be signed in to sync data"
+        case .networkUnavailable:
+            return "Network unavailable. Changes will sync when online"
+        case .firestoreError(let error):
+            return "Cloud sync error: \(error.localizedDescription)"
+        case .dataStoreError(let error):
+            return "Local storage error: \(error.localizedDescription)"
+        case .conflictResolutionFailed:
+            return "Failed to resolve data conflict"
+        case .migrationFailed(let reason):
+            return "Migration failed: \(reason)"
+        case .queueProcessingFailed(let count):
+            return "Failed to sync \(count) pending operations"
+        case .maxRetriesExceeded(let operationId, let attempts):
+            return "Sync failed after \(attempts) retry attempts for operation: \(operationId)"
+        case .invalidData(let reason):
+            return "Invalid data: \(reason)"
+        case .accountDeletionFailed(let reason):
+            return "Failed to delete account data: \(reason)"
+        }
     }
 }

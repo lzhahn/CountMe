@@ -25,11 +25,11 @@ final class CountMeTests: XCTestCase {
         // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
     }
 
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        measure {
-            // Put the code you want to measure the time of here.
-        }
-    }
+    // Disabled - performance tests slow down test suite
+    // func testPerformanceExample() throws {
+    //     measure {
+    //         // Put the code you want to measure the time of here.
+    //     }
+    // }
 
 }

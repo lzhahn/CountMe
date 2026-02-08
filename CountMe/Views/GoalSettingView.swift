@@ -27,6 +27,9 @@ struct GoalSettingView: View {
     /// Goal value input
     @State private var goalText: String = ""
     
+    @AppStorage("exerciseBodyWeightKg") private var bodyWeightKg: Double = 70
+    @AppStorage("weightLossLbsPerWeek") private var weightLossLbsPerWeek: Double = 1.0
+    
     /// Validation error message
     @State private var validationError: String?
     
@@ -63,6 +66,20 @@ struct GoalSettingView: View {
                         
                         Text("kcal")
                             .foregroundColor(.secondary)
+                    }
+                    
+                    if suggestedDailyCalories > 0 {
+                        HStack {
+                            Text("Suggested")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(Int(suggestedDailyCalories)) kcal")
+                                .fontWeight(.semibold)
+                        }
+                        
+                        Button("Use Suggested Goal") {
+                            goalText = String(Int(suggestedDailyCalories))
+                        }
                     }
                 } header: {
                     Text("Set New Goal")
@@ -166,6 +183,14 @@ struct GoalSettingView: View {
                 }
             }
         }
+    }
+    
+    private var suggestedDailyCalories: Double {
+        guard bodyWeightKg > 0 else { return 0 }
+        let weightLb = bodyWeightKg * 2.20462
+        let maintenanceCalories = weightLb * 14.0
+        let dailyDeficit = max(weightLossLbsPerWeek, 0) * 3500.0 / 7.0
+        return max(maintenanceCalories - dailyDeficit, 0)
     }
 }
 

@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================================
+    // Helper Functions
+    // ============================================================================
+    
+    /// Checks if the request is from an authenticated user
+    /// @returns {boolean} true if user is authenticated, false otherwise
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    /// Checks if the authenticated user owns the resource
+    /// @param userId The user ID to check ownership against
+    /// @returns {boolean} true if authenticated user matches userId, false otherwise
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    /// Validates that the data being written has the correct userId
+    /// @returns {boolean} true if userId in data matches authenticated user
+    function hasValidUserId() {
+      return isAuthenticated() && 
+             request.resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // User Profile and Settings
+    // ============================================================================
+    
+    /// User profile and settings collection
+    /// Path: users/{userId}/profile/{document}
+    /// Access: User can only read/write their own profile
+    match /users/{userId}/profile/{document=**} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // ============================================================================
+    // Daily Logs Collection
+    // ============================================================================
+    
+    /// Daily logs collection - stores daily calorie tracking logs
+    /// Path: users/{userId}/dailyLogs/{logId}
+    /// Access: User can only access their own daily logs
+    /// Validation: userId in document must match authenticated user
+    match /users/{userId}/dailyLogs/{logId} {
+      // Read: User can read their own daily logs
+      allow read: if isOwner(userId);
+      
+      // Update/Delete: User can modify their own daily logs
+      allow update, delete: if isOwner(userId);
+      
+      // Create: User can create daily logs with their userId
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // Food Items Collection
+    // ============================================================================
+    
+    /// Food items collection - stores individual food entries
+    /// Path: users/{userId}/foodItems/{itemId}
+    /// Access: User can only access their own food items
+    /// Validation: userId in document must match authenticated user
+    match /users/{userId}/foodItems/{itemId} {
+      // Read: User can read their own food items
+      allow read: if isOwner(userId);
+      
+      // Update/Delete: User can modify their own food items
+      allow update, delete: if isOwner(userId);
+      
+      // Create: User can create food items with their userId
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // Custom Meals Collection
+    // ============================================================================
+    
+    /// Custom meals collection - stores user-defined meal templates
+    /// Path: users/{userId}/customMeals/{mealId}
+    /// Access: User can only access their own custom meals
+    /// Validation: userId in document must match authenticated user
+    match /users/{userId}/customMeals/{mealId} {
+      // Read: User can read their own custom meals
+      allow read: if isOwner(userId);
+      
+      // Update/Delete: User can modify their own custom meals
+      allow update, delete: if isOwner(userId);
+      
+      // Create: User can create custom meals with their userId
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // Default Deny Rule
+    // ============================================================================
+    
+    /// Deny all other access by default
+    /// This ensures that any collection not explicitly allowed above is denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

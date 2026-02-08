@@ -10,17 +10,17 @@ import Observation
 
 /// Manages custom meal lifecycle including AI parsing, CRUD operations, and daily log integration
 ///
-/// CustomMealManager coordinates between the AI recipe parser, data store, and UI layer
+/// CustomMealManager coordinates between the AI recipe parser, data store, sync engine, and UI layer
 /// to provide a complete custom meal management experience. It handles recipe parsing,
-/// meal persistence, search/filtering, and conversion of custom meals to food items.
+/// meal persistence, search/filtering, conversion of custom meals to food items, and cloud synchronization.
 ///
 /// The manager maintains an observable state for UI binding and provides user-friendly
 /// error messages for all failure scenarios.
 ///
 /// **Thread Safety**: This class is marked @Observable and should be used from the main actor.
-/// All async operations internally coordinate with actor-isolated dependencies (DataStore, AIRecipeParser).
+/// All async operations internally coordinate with actor-isolated dependencies (DataStore, AIRecipeParser, FirebaseSyncEngine).
 ///
-/// **Validates: Requirements 1.1, 1.5, 2.1, 2.3, 3.3, 9.3, 12.1**
+/// **Validates: Requirements 1.1, 1.5, 2.1, 2.3, 3.3, 5.2, 9.3, 12.1**
 @Observable
 @MainActor
 final class CustomMealManager {
@@ -28,6 +28,8 @@ final class CustomMealManager {
     
     private let dataStore: DataStore
     private let aiParser: AIRecipeParser
+    private var syncEngine: FirebaseSyncEngine?
+    private var userId: String?
     
     // MARK: - Observable State
     
@@ -47,9 +49,30 @@ final class CustomMealManager {
     /// - Parameters:
     ///   - dataStore: Actor-based persistence layer for custom meals
     ///   - aiParser: AI service for parsing recipe descriptions
-    init(dataStore: DataStore, aiParser: AIRecipeParser) {
+    ///   - syncEngine: Optional sync engine for cloud synchronization
+    ///   - userId: Optional authenticated user ID for sync operations
+    init(
+        dataStore: DataStore,
+        aiParser: AIRecipeParser,
+        syncEngine: FirebaseSyncEngine? = nil,
+        userId: String? = nil
+    ) {
         self.dataStore = dataStore
         self.aiParser = aiParser
+        self.syncEngine = syncEngine
+        self.userId = userId
+    }
+    
+    // MARK: - Sync Configuration
+    
+    /// Updates the sync engine and user ID for cloud synchronization
+    /// Call this when authentication state changes
+    /// - Parameters:
+    ///   - syncEngine: The sync engine instance (nil if signed out)
+    ///   - userId: The authenticated user's ID (nil if signed out)
+    func configureSyncEngine(_ syncEngine: FirebaseSyncEngine?, userId: String?) {
+        self.syncEngine = syncEngine
+        self.userId = userId
     }
     
     // MARK: - Recipe Parsing
@@ -98,6 +121,7 @@ final class CustomMealManager {
     // MARK: - Custom Meal CRUD Operations
     
     /// Saves a new custom meal with ingredients to persistent storage
+    /// Syncs to cloud if authenticated
     ///
     /// Creates a CustomMeal object with the provided name and ingredients, then
     /// persists it to the data store. The meal becomes immediately available for
@@ -115,7 +139,7 @@ final class CustomMealManager {
     /// let meal = try await manager.saveCustomMeal(name: "My Stir Fry", ingredients: ingredients)
     /// ```
     ///
-    /// **Validates: Requirements 1.5, 2.1**
+    /// **Validates: Requirements 1.5, 2.1, 5.2**
     func saveCustomMeal(name: String, ingredients: [Ingredient]) async throws -> CustomMeal {
         isLoading = true
         errorMessage = nil
@@ -133,7 +157,23 @@ final class CustomMealManager {
                 servingsCount: 1.0
             )
             
+            // Save locally
             try await dataStore.saveCustomMeal(meal)
+            
+            // Sync to cloud if authenticated
+            if let syncEngine = syncEngine, let userId = userId {
+                meal.userId = userId
+                meal.lastModified = Date()
+                meal.syncStatus = .pendingUpload
+                
+                do {
+                    try await syncEngine.syncCustomMeal(meal, userId: userId)
+                } catch let error as SyncError {
+                    // Handle sync errors gracefully - local data is already saved
+                    print("⚠️ Sync error while saving custom meal: \(error.localizedDescription)")
+                    // Don't throw - the meal was saved locally successfully
+                }
+            }
             
             // Reload all meals to update UI
             await loadAllCustomMeals()
@@ -146,6 +186,7 @@ final class CustomMealManager {
     }
     
     /// Updates an existing custom meal in persistent storage
+    /// Syncs update to cloud if authenticated
     ///
     /// Updates the meal's data including ingredients, name, and timestamps.
     /// The lastUsedAt timestamp is automatically updated to the current time.
@@ -163,7 +204,7 @@ final class CustomMealManager {
     /// try await manager.updateCustomMeal(meal)
     /// ```
     ///
-    /// **Validates: Requirements 9.3, 2.4**
+    /// **Validates: Requirements 9.3, 2.4, 5.2**
     func updateCustomMeal(_ meal: CustomMeal) async throws {
         isLoading = true
         errorMessage = nil
@@ -176,7 +217,23 @@ final class CustomMealManager {
             // Update the lastUsedAt timestamp
             meal.lastUsedAt = Date()
             
+            // Update locally
             try await dataStore.updateCustomMeal(meal)
+            
+            // Sync to cloud if authenticated
+            if let syncEngine = syncEngine, let userId = userId {
+                meal.userId = userId
+                meal.lastModified = Date()
+                meal.syncStatus = .pendingUpload
+                
+                do {
+                    try await syncEngine.syncCustomMeal(meal, userId: userId)
+                } catch let error as SyncError {
+                    // Handle sync errors gracefully - local data is already updated
+                    print("⚠️ Sync error while updating custom meal: \(error.localizedDescription)")
+                    // Don't throw - the meal was updated locally successfully
+                }
+            }
             
             // Reload all meals to update UI
             await loadAllCustomMeals()
@@ -187,6 +244,7 @@ final class CustomMealManager {
     }
     
     /// Deletes a custom meal and all associated ingredients
+    /// Syncs deletion to cloud if authenticated
     ///
     /// Removes the custom meal from persistent storage with cascade deletion
     /// of all ingredients. Previously logged meal instances in daily logs are
@@ -201,7 +259,7 @@ final class CustomMealManager {
     /// // Meal and all ingredients are removed from storage
     /// ```
     ///
-    /// **Validates: Requirements 2.3 (Property 5: Cascade Deletion Completeness)**
+    /// **Validates: Requirements 2.3, 5.2 (Property 5: Cascade Deletion Completeness)**
     func deleteCustomMeal(_ meal: CustomMeal) async throws {
         isLoading = true
         errorMessage = nil
@@ -211,7 +269,23 @@ final class CustomMealManager {
         }
         
         do {
+            // Delete locally
             try await dataStore.deleteCustomMeal(meal)
+            
+            // Sync deletion to cloud if authenticated
+            if let syncEngine = syncEngine, let userId = userId {
+                do {
+                    try await syncEngine.deleteEntity(
+                        entityId: meal.id,
+                        entityType: .customMeal,
+                        userId: userId
+                    )
+                } catch let error as SyncError {
+                    // Handle sync errors gracefully - local data is already deleted
+                    print("⚠️ Sync error while deleting custom meal: \(error.localizedDescription)")
+                    // Don't throw - the meal was deleted locally successfully
+                }
+            }
             
             // Reload all meals to update UI
             await loadAllCustomMeals()

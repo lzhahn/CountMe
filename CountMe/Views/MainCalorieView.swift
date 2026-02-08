@@ -18,14 +18,21 @@ import SwiftData
 /// - Navigation to food search
 /// - List of today's food items
 /// - Macro breakdown (protein, carbs, fats) for daily totals
+/// - Pull-to-refresh for manual sync
 ///
-/// Requirements: 3.4, 4.2, 4.3, 4.4, 1.1, 5.1, 5.2
+/// Requirements: 3.4, 4.2, 4.3, 4.4, 1.1, 5.1, 5.2, 13.5
 struct MainCalorieView: View {
     /// The calorie tracker business logic
     @Bindable var tracker: CalorieTracker
     
     /// The custom meal manager for browsing custom meals
     @Bindable var customMealManager: CustomMealManager
+    
+    /// Optional sync engine for cloud synchronization
+    var syncEngine: FirebaseSyncEngine?
+    
+    /// Optional authenticated user ID for sync operations
+    var userId: String?
     
     /// Controls navigation to food search view
     @State private var showingFoodSearch = false
@@ -44,6 +51,12 @@ struct MainCalorieView: View {
     
     /// Controls navigation to manual entry
     @State private var showingManualEntry = false
+
+    /// Controls navigation to exercise entry
+    @State private var showingExerciseEntry = false
+    
+    /// The exercise item currently being edited
+    @State private var editingExerciseItem: ExerciseItem?
     
     /// Controls the add menu visibility
     @State private var showingAddMenu = false
@@ -51,31 +64,60 @@ struct MainCalorieView: View {
     /// The food item currently being edited
     @State private var editingItem: FoodItem?
     
+    /// Controls whether multi-select mode is active
+    @State private var isSelectionMode = false
+    
+    /// Tracks selected food items in selection mode
+    @State private var selectedItems: Set<String> = []
+    
+    /// Controls navigation to meal builder review view
+    @State private var showingMealBuilderReview = false
+    
+    /// Controls toast notification display
+    @State private var showingToast: Bool = false
+    
+    /// Toast message
+    @State private var toastMessage: String = ""
+    
+    /// Toast style
+    @State private var toastStyle: ToastStyle = .success
+    
+    /// Tracks if sync is in progress
+    @State private var isSyncing: Bool = false
+    
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottomTrailing) {
-                VStack(spacing: 20) {
-                    // Daily total and progress section
-                    dailyTotalSection
-                    
-                    // Macro breakdown section
-                    if let log = tracker.currentLog {
-                        MacroDisplayView(
-                            protein: log.totalProtein,
-                            carbohydrates: log.totalCarbohydrates,
-                            fats: log.totalFats
-                        )
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Daily total and progress section
+                        dailyTotalSection
+                        
+                        // Macro breakdown section
+                        if let log = tracker.currentLog {
+                            MacroDisplayView(
+                                protein: log.totalProtein,
+                                carbohydrates: log.totalCarbohydrates,
+                                fats: log.totalFats
+                            )
+                        }
+                        
+                        // Combined food + exercise list
+                        combinedItemsList
+                        
+                        Spacer(minLength: 100) // Space for FAB
                     }
-                    
-                    // Food items list
-                    foodItemsList
-                    
-                    Spacer()
+                    .padding()
                 }
-                .padding()
+                .refreshable {
+                    await performManualSync()
+                }
                 
-                // Floating action button
-                floatingActionButton
+                // Floating action button (hidden in selection mode)
+                if !isSelectionMode {
+                    floatingActionButton
+                }
             }
             .navigationTitle("Today")
             .toolbar {
@@ -85,6 +127,23 @@ struct MainCalorieView: View {
                     } label: {
                         Image(systemName: "target")
                             .font(.title3)
+                    }
+                    .disabled(isSelectionMode)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isSelectionMode {
+                        Button("Cancel") {
+                            exitSelectionMode()
+                        }
+                    } else {
+                        Button {
+                            enterSelectionMode()
+                        } label: {
+                            Image(systemName: "checkmark.circle")
+                                .font(.title3)
+                        }
+                        .disabled(tracker.currentLog?.foodItems.isEmpty ?? true)
                     }
                 }
             }
@@ -133,27 +192,35 @@ struct MainCalorieView: View {
                 ManualEntryView(tracker: tracker)
             }
             .sheet(item: $editingItem) { item in
-                // TODO: Replace with ManualEntryView when implemented
-                NavigationStack {
-                    VStack(spacing: 20) {
-                        Text("Edit Food Item")
-                            .font(.headline)
-                        
-                        Text(item.name)
-                            .font(.title2)
-                        
-                        Text("\(Int(item.calories)) calories")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                        
-                        Button("Close") {
-                            editingItem = nil
+                ManualEntryView(tracker: tracker, editingItem: item)
+            }
+            .sheet(isPresented: $showingExerciseEntry) {
+                ExerciseEntryView(tracker: tracker)
+            }
+            .sheet(item: $editingExerciseItem) { item in
+                ExerciseEntryView(tracker: tracker, editingItem: item)
+            }
+            .sheet(isPresented: $showingMealBuilderReview) {
+                if let log = tracker.currentLog {
+                    let selectedFoodItems = log.foodItems.filter { selectedItems.contains($0.id) }
+                    MealBuilderReviewView(
+                        sourceItems: .foodItems(selectedFoodItems),
+                        manager: customMealManager,
+                        onComplete: {
+                            // Exit selection mode and show success toast
+                            exitSelectionMode()
+                            toastMessage = "Custom meal created successfully"
+                            toastStyle = .success
+                            showingToast = true
                         }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
+                    )
                 }
             }
+            .toast(
+                isPresented: $showingToast,
+                message: toastMessage,
+                style: toastStyle
+            )
         }
     }
     
@@ -192,6 +259,16 @@ struct MainCalorieView: View {
                     ) {
                         showingAddMenu = false
                         showingManualEntry = true
+                    }
+                    
+                    // Exercise entry option
+                    FloatingMenuButton(
+                        icon: "figure.walk",
+                        title: "Exercise",
+                        color: .teal
+                    ) {
+                        showingAddMenu = false
+                        showingExerciseEntry = true
                     }
                 }
                 .transition(.scale.combined(with: .opacity))
@@ -241,13 +318,46 @@ struct MainCalorieView: View {
                 
                 // Calorie count in center
                 VStack(spacing: 4) {
-                    Text("\(Int(currentTotal))")
+                    Text("\(Int(mainDisplayValue))")
                         .font(.system(size: 40, weight: .bold))
                         .foregroundColor(progressColor)
                     
-                    Text("calories")
+                    Text(mainDisplayLabel)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+            }
+            
+            if let log = tracker.currentLog {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Food")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(Int(log.totalCalories)) cal")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Exercise")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(Int(log.totalExerciseCalories)) cal")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Net")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(Int(log.netCalories)) cal")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Spacer()
                 }
             }
             
@@ -262,7 +372,7 @@ struct MainCalorieView: View {
                             .fontWeight(.semibold)
                     }
                     
-                    if let remaining = tracker.getRemainingCalories() {
+                    if let remaining = remainingCaloriesForDisplay {
                         HStack {
                             Text("Remaining:")
                                 .foregroundColor(.secondary)
@@ -270,6 +380,17 @@ struct MainCalorieView: View {
                             Text("\(Int(remaining)) cal")
                                 .fontWeight(.semibold)
                                 .foregroundColor(remaining >= 0 ? .green : .red)
+                        }
+                    }
+                    
+                    if let remaining = remainingCaloriesForDisplay {
+                        HStack {
+                            Text("To Stay On Goal:")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(Int(max(remaining, 0))) cal")
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
                         }
                     }
                 }
@@ -280,39 +401,154 @@ struct MainCalorieView: View {
         }
     }
     
-    /// List of food items for today
-    private var foodItemsList: some View {
+    /// Combined list of food and exercise items for today
+    private var combinedItemsList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Today's Food")
-                .font(.headline)
-            
-            if let items = tracker.currentLog?.foodItems, !items.isEmpty {
-                List {
-                    ForEach(items, id: \.id) { item in
-                        FoodItemRow(
-                            item: item,
-                            onDelete: {
-                                Task {
-                                    try? await tracker.removeFoodItem(item)
-                                }
-                            },
-                            onEdit: {
-                                editingItem = item
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            HStack {
+                Text("Today's Log")
+                    .font(.headline)
+                
+                Spacer()
+                
+                // Show selection count and Create Meal button when items are selected
+                if isSelectionMode && !selectedItems.isEmpty {
+                    HStack(spacing: 12) {
+                        Text("\(selectedItems.count) selected")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Button {
+                            showingMealBuilderReview = true
+                        } label: {
+                            Text("Create Meal")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue)
+                                .cornerRadius(8)
+                        }
                     }
                 }
-                .listStyle(.plain)
-                .frame(maxHeight: 400)
-            } else {
-                emptyStateView
             }
+            
+            List {
+                Section("Food") {
+                    if let items = tracker.currentLog?.foodItems, !items.isEmpty {
+                        let _ = print("🍽️ Displaying \(items.count) food items in list")
+                        ForEach(items, id: \.id) { item in
+                            HStack(spacing: 12) {
+                                if isSelectionMode {
+                                    Button {
+                                        toggleSelection(for: item)
+                                    } label: {
+                                        Image(systemName: selectedItems.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3)
+                                            .foregroundColor(selectedItems.contains(item.id) ? .blue : .gray)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                
+                                FoodItemRow(
+                                    item: item,
+                                    onDelete: {
+                                        Task {
+                                            try? await tracker.removeFoodItem(item)
+                                        }
+                                    },
+                                    onEdit: {
+                                        editingItem = item
+                                    },
+                                    isSelectionMode: isSelectionMode
+                                )
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                if !isSelectionMode {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            try? await tracker.removeFoodItem(item)
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                            .contextMenu {
+                                if !isSelectionMode {
+                                    Button {
+                                        editingItem = item
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    
+                                    Button(role: .destructive) {
+                                        Task {
+                                            try? await tracker.removeFoodItem(item)
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        emptyFoodState
+                    }
+                }
+                
+                Section("Exercise") {
+                    if let items = tracker.currentLog?.exerciseItems, !items.isEmpty {
+                        ForEach(items.sorted { $0.timestamp > $1.timestamp }, id: \.id) { item in
+                            ExerciseItemRow(
+                                item: item,
+                                onDelete: {
+                                    Task {
+                                        try? await tracker.removeExerciseItem(item)
+                                    }
+                                },
+                                onEdit: {
+                                    editingExerciseItem = item
+                                }
+                            )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        try? await tracker.removeExerciseItem(item)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .contextMenu {
+                                Button {
+                                    editingExerciseItem = item
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    Task {
+                                        try? await tracker.removeExerciseItem(item)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    } else {
+                        emptyExerciseState
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 260, maxHeight: 520)
         }
     }
     
     /// Empty state when no food items are logged
-    private var emptyStateView: some View {
+    private var emptyFoodState: some View {
         VStack(spacing: 12) {
             Image(systemName: "fork.knife.circle")
                 .font(.system(size: 48))
@@ -331,11 +567,85 @@ struct MainCalorieView: View {
         .padding(.vertical, 40)
     }
     
+    /// Empty state when no exercise items are logged
+    private var emptyExerciseState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "figure.walk.circle")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary)
+            
+            Text("No exercise logged yet")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+    }
+    
+    /// Error state view with retry button
+    ///
+    /// Displays when sync errors occur, providing a manual retry option
+    /// for users to attempt sync again.
+    ///
+    /// **Validates: Requirements 13.5 (Manual Retry UI)**
+    private func errorStateView(message: String, onRetry: @escaping () async -> Void) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 48))
+                .foregroundColor(.orange)
+            
+            Text("Sync Error")
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button {
+                Task {
+                    await onRetry()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Retry Sync")
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(10)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+    
     // MARK: - Computed Properties
     
     /// Current daily total calories
     private var currentTotal: Double {
-        tracker.getCurrentDailyTotal()
+        tracker.getNetCalories()
+    }
+    
+    private var mainDisplayValue: Double {
+        if let remaining = remainingCaloriesForDisplay {
+            return max(remaining, 0)
+        }
+        return currentTotal
+    }
+    
+    private var mainDisplayLabel: String {
+        remainingCaloriesForDisplay == nil ? "net calories" : "remaining"
+    }
+    
+    private var remainingCaloriesForDisplay: Double? {
+        tracker.currentLog?.remainingCalories
     }
     
     /// Progress percentage for the circular indicator (0.0 to 1.0)
@@ -343,7 +653,9 @@ struct MainCalorieView: View {
         guard let goal = tracker.currentLog?.dailyGoal, goal > 0 else {
             return 0
         }
-        return min(CGFloat(currentTotal / goal), 1.0)
+        let remaining = remainingCaloriesForDisplay ?? goal
+        let raw = 1.0 - (remaining / goal)
+        return min(max(CGFloat(raw), 0.0), 1.0)
     }
     
     /// Color for progress indicator based on goal status
@@ -358,6 +670,93 @@ struct MainCalorieView: View {
             return .orange // Close to goal
         } else {
             return .green // On track
+        }
+    }
+    
+    // MARK: - Selection Mode Methods
+    
+    /// Enter multi-select mode for creating meals from food items
+    private func enterSelectionMode() {
+        isSelectionMode = true
+        selectedItems.removeAll()
+    }
+    
+    /// Exit multi-select mode and clear selections
+    private func exitSelectionMode() {
+        isSelectionMode = false
+        selectedItems.removeAll()
+    }
+    
+    /// Toggle selection state for a food item
+    private func toggleSelection(for item: FoodItem) {
+        if selectedItems.contains(item.id) {
+            selectedItems.remove(item.id)
+        } else {
+            selectedItems.insert(item.id)
+        }
+    }
+    
+    // MARK: - Sync Methods
+    
+    /// Performs manual sync when user pulls to refresh
+    ///
+    /// Triggers the sync engine to process all queued operations and download
+    /// any cloud changes. Displays toast notifications for success or failure.
+    ///
+    /// **Validates: Requirements 13.5 (Manual Retry)**
+    private func performManualSync() async {
+        guard let syncEngine = syncEngine, let userId = userId else {
+            // No sync engine configured - skip sync
+            return
+        }
+        
+        isSyncing = true
+        
+        do {
+            // Trigger manual sync
+            try await syncEngine.forceSyncNow()
+            
+            // Show success toast
+            await MainActor.run {
+                toastMessage = "Sync completed successfully"
+                toastStyle = .success
+                showingToast = true
+                isSyncing = false
+            }
+            
+        } catch let error as SyncError {
+            // Handle sync errors
+            await MainActor.run {
+                switch error {
+                case .networkUnavailable:
+                    toastMessage = "No internet connection"
+                    toastStyle = .error
+                    
+                case .notAuthenticated:
+                    toastMessage = "Please sign in to sync"
+                    toastStyle = .error
+                    
+                case .queueProcessingFailed(let count):
+                    toastMessage = "Failed to sync \(count) items"
+                    toastStyle = .error
+                    
+                default:
+                    toastMessage = "Sync failed: \(error.localizedDescription)"
+                    toastStyle = .error
+                }
+                
+                showingToast = true
+                isSyncing = false
+            }
+            
+        } catch {
+            // Handle unexpected errors
+            await MainActor.run {
+                toastMessage = "Sync failed: \(error.localizedDescription)"
+                toastStyle = .error
+                showingToast = true
+                isSyncing = false
+            }
         }
     }
 }

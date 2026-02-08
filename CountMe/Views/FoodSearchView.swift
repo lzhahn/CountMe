@@ -62,6 +62,24 @@ struct FoodSearchView: View {
         case customMeals = "Custom Meals"
     }
     
+    /// Build custom meal mode state
+    @State private var isBuildingMeal: Bool = false
+    
+    /// Selected search results for building a custom meal
+    @State private var selectedResults: [NutritionSearchResult] = []
+    
+    /// Controls navigation to meal builder review view
+    @State private var showingMealBuilderReview: Bool = false
+    
+    /// Controls toast notification display
+    @State private var showingToast: Bool = false
+    
+    /// Toast message
+    @State private var toastMessage: String = ""
+    
+    /// Toast style
+    @State private var toastStyle: ToastStyle = .success
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -87,16 +105,43 @@ struct FoodSearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+                    if isBuildingMeal {
+                        Button("Cancel Build") {
+                            cancelBuildMode()
+                        }
+                    } else {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingManualEntry = true
-                    } label: {
-                        Label("Manual Entry", systemImage: "pencil.circle")
+                    if isBuildingMeal {
+                        Button {
+                            showingMealBuilderReview = true
+                        } label: {
+                            Label("Review & Save", systemImage: "checkmark.circle")
+                        }
+                        .disabled(selectedResults.isEmpty)
+                    } else {
+                        Menu {
+                            Button {
+                                showingManualEntry = true
+                            } label: {
+                                Label("Manual Entry", systemImage: "pencil.circle")
+                            }
+                            
+                            if selectedTab == .api {
+                                Button {
+                                    enterBuildMode()
+                                } label: {
+                                    Label("Build Custom Meal", systemImage: "square.stack.3d.up")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "plus.circle")
+                        }
                     }
                 }
             }
@@ -106,6 +151,25 @@ struct FoodSearchView: View {
             .sheet(item: $selectedResult) { result in
                 ServingAdjustmentView(searchResult: result, tracker: tracker)
             }
+            .sheet(isPresented: $showingMealBuilderReview) {
+                MealBuilderReviewView(
+                    sourceItems: .searchResults(selectedResults),
+                    manager: customMealManager,
+                    onComplete: {
+                        // Exit build mode, clear selections, and show success toast
+                        isBuildingMeal = false
+                        selectedResults = []
+                        toastMessage = "Custom meal created successfully"
+                        toastStyle = .success
+                        showingToast = true
+                    }
+                )
+            }
+            .toast(
+                isPresented: $showingToast,
+                message: toastMessage,
+                style: toastStyle
+            )
             .onAppear {
                 networkMonitor.start()
             }
@@ -138,16 +202,29 @@ struct FoodSearchView: View {
     /// API search content area
     @ViewBuilder
     private var apiSearchContent: some View {
-        if isSearching {
-            loadingView
-        } else if let error = errorMessage {
-            errorView(error)
-        } else if searchResults.isEmpty && !searchQuery.isEmpty {
-            emptyResultsView
-        } else if searchResults.isEmpty {
-            initialStateView
-        } else {
-            searchResultsList
+        VStack(spacing: 0) {
+            // Build mode banner
+            if isBuildingMeal {
+                buildModeBanner
+            }
+            
+            // Search results or states
+            if isSearching {
+                loadingView
+            } else if let error = errorMessage {
+                errorView(error)
+            } else if searchResults.isEmpty && !searchQuery.isEmpty {
+                emptyResultsView
+            } else if searchResults.isEmpty {
+                initialStateView
+            } else {
+                searchResultsList
+            }
+            
+            // Selected items summary (shown at bottom when building)
+            if isBuildingMeal && !selectedResults.isEmpty {
+                selectedItemsSummary
+            }
         }
     }
     
@@ -316,11 +393,30 @@ struct FoodSearchView: View {
     private var searchResultsList: some View {
         List {
             ForEach(searchResults) { result in
-                SearchResultRow(result: result)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectResult(result)
+                HStack(spacing: 12) {
+                    // Selection checkbox (only in build mode)
+                    if isBuildingMeal {
+                        Button {
+                            toggleSelection(result)
+                        } label: {
+                            Image(systemName: isSelected(result) ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(isSelected(result) ? .blue : .gray)
+                                .font(.title3)
+                        }
+                        .buttonStyle(.plain)
                     }
+                    
+                    // Search result row
+                    SearchResultRow(result: result)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if isBuildingMeal {
+                                toggleSelection(result)
+                            } else {
+                                selectResult(result)
+                            }
+                        }
+                }
             }
         }
         .listStyle(.plain)
@@ -348,7 +444,214 @@ struct FoodSearchView: View {
         .background(Color.orange.opacity(0.1))
     }
     
+    /// Build mode banner
+    private var buildModeBanner: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.stack.3d.up.fill")
+                    .foregroundColor(.blue)
+                    .font(.title3)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Build Custom Meal Mode")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    
+                    Text("Select multiple items to create a custom meal")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            .padding()
+            .background(Color.blue.opacity(0.1))
+        }
+    }
+    
+    /// Selected items summary at bottom
+    private var selectedItemsSummary: some View {
+        VStack(spacing: 0) {
+            Divider()
+            
+            VStack(spacing: 12) {
+                // Header
+                HStack {
+                    Text("Selected Items (\(selectedResults.count))")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    Button("Clear All") {
+                        selectedResults = []
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.red)
+                }
+                
+                // Nutritional summary
+                HStack(spacing: 16) {
+                    nutritionalSummaryBadge(
+                        label: "Calories",
+                        value: totalSelectedCalories,
+                        unit: "cal",
+                        color: .blue
+                    )
+                    
+                    if totalSelectedProtein > 0 {
+                        nutritionalSummaryBadge(
+                            label: "Protein",
+                            value: totalSelectedProtein,
+                            unit: "g",
+                            color: .blue
+                        )
+                    }
+                    
+                    if totalSelectedCarbs > 0 {
+                        nutritionalSummaryBadge(
+                            label: "Carbs",
+                            value: totalSelectedCarbs,
+                            unit: "g",
+                            color: .green
+                        )
+                    }
+                    
+                    if totalSelectedFats > 0 {
+                        nutritionalSummaryBadge(
+                            label: "Fats",
+                            value: totalSelectedFats,
+                            unit: "g",
+                            color: .orange
+                        )
+                    }
+                }
+                
+                // Selected items list (scrollable if many)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(selectedResults) { result in
+                            selectedItemChip(result)
+                        }
+                    }
+                }
+                
+                // Action buttons
+                HStack(spacing: 12) {
+                    Button {
+                        // Continue building - just dismiss this summary, stay in build mode
+                    } label: {
+                        Text("Continue Building")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button {
+                        showingMealBuilderReview = true
+                    } label: {
+                        Text("Review & Save")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding()
+            .background(Color(.systemBackground))
+        }
+    }
+    
+    /// Nutritional summary badge
+    private func nutritionalSummaryBadge(label: String, value: Double, unit: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            
+            HStack(spacing: 2) {
+                Text("\(Int(value))")
+                    .font(.headline)
+                    .foregroundColor(color)
+                
+                Text(unit)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(color.opacity(0.1))
+        .cornerRadius(8)
+    }
+    
+    /// Selected item chip with remove button
+    private func selectedItemChip(_ result: NutritionSearchResult) -> some View {
+        HStack(spacing: 6) {
+            Text(result.name)
+                .font(.caption)
+                .lineLimit(1)
+            
+            Button {
+                toggleSelection(result)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(.systemGray5))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Computed Properties for Selected Items
+    
+    /// Total calories of selected items
+    private var totalSelectedCalories: Double {
+        selectedResults.reduce(0) { $0 + $1.calories }
+    }
+    
+    /// Total protein of selected items
+    private var totalSelectedProtein: Double {
+        selectedResults.reduce(0) { $0 + ($1.protein ?? 0) }
+    }
+    
+    /// Total carbs of selected items
+    private var totalSelectedCarbs: Double {
+        selectedResults.reduce(0) { $0 + ($1.carbohydrates ?? 0) }
+    }
+    
+    /// Total fats of selected items
+    private var totalSelectedFats: Double {
+        selectedResults.reduce(0) { $0 + ($1.fats ?? 0) }
+    }
+    
     // MARK: - Actions
+    
+    /// Enters build custom meal mode
+    private func enterBuildMode() {
+        isBuildingMeal = true
+        selectedResults = []
+    }
+    
+    /// Cancels build custom meal mode
+    private func cancelBuildMode() {
+        isBuildingMeal = false
+        selectedResults = []
+    }
+    
+    /// Checks if a result is selected
+    private func isSelected(_ result: NutritionSearchResult) -> Bool {
+        selectedResults.contains { $0.id == result.id }
+    }
+    
+    /// Toggles selection of a search result
+    private func toggleSelection(_ result: NutritionSearchResult) {
+        if let index = selectedResults.firstIndex(where: { $0.id == result.id }) {
+            selectedResults.remove(at: index)
+        } else {
+            selectedResults.append(result)
+        }
+    }
     
     /// Performs a search using the current query
     private func performSearch() {

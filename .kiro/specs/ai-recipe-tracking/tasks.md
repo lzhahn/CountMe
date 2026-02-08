@@ -286,13 +286,78 @@ The implementation maintains consistency with existing CountMe patterns (actor-b
   - Ensure all error messages are user-friendly and actionable
   - _Requirements: 7.3, 7.4, 10.4_
 
-- [ ] 20. Final checkpoint - Integration testing and polish
+- [x] 20. Implement conversion utilities for building meals from existing data
+  - Create `convertSearchResultToIngredient(_ result: NutritionSearchResult)` function
+  - Create `convertFoodItemToIngredient(_ foodItem: FoodItem)` function
+  - Map all fields to Ingredient (name, calories, serving size/unit, macros)
+  - Handle optional macro values (preserve nil or convert to 0 as appropriate)
+  - Validate that converted ingredients have all required fields
+  - Return Ingredient instances ready for CustomMeal creation
+  - _Requirements: 13.5, 13.6, 14.3, 14.4_
+
+- [ ]* 20.1 Write property test for search-result-to-Ingredient conversion preservation
+  - **Property 22: SearchResult-to-Ingredient Conversion Preservation**
+  - **Validates: Requirements 13.5, 13.6**
+
+- [ ]* 20.2 Write property test for FoodItem-to-Ingredient conversion preservation
+  - **Property 23: FoodItem-to-Ingredient Conversion Preservation**
+  - **Validates: Requirements 14.3, 14.4**
+
+- [x] 21. Add "Build Custom Meal" mode to FoodSearchView
+  - Add toggle or mode switch to enter "Build Custom Meal" mode
+  - Show selection checkboxes next to search results when in build mode
+  - Track selected search results in state array
+  - Show running ingredient list at bottom with nutritional summary
+  - Add "Continue Building" button to keep searching and adding items
+  - Add "Review & Save" button to proceed to ingredient review
+  - Allow removing items from selection before saving
+  - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.10_
+
+- [x] 22. Add multi-select mode to MainCalorieView/DailyLog display
+  - Add "Select Items" button in toolbar or edit mode
+  - Implement multi-select UI with checkboxes for each FoodItem
+  - Track selected FoodItems in state array
+  - Show selection count and "Create Meal" action button when items selected
+  - Add "Cancel" button to exit selection mode
+  - Disable other actions (delete, edit) while in selection mode
+  - _Requirements: 14.1, 14.2_
+
+- [x] 23. Implement MealBuilderReviewView for reviewing selected items
+  - Create SwiftUI view that receives either NutritionSearchResults or FoodItems
+  - Convert items to Ingredients using appropriate conversion utility
+  - Display ingredient list with nutritional summary (similar to IngredientReviewView)
+  - Allow editing of converted ingredients (adjust quantities, serving sizes, names)
+  - Show total nutritional breakdown (calories, protein, carbs, fats)
+  - Prompt for meal name before saving
+  - Validate meal name (non-empty, reasonable length)
+  - Call CustomMealManager.saveCustomMeal() with converted ingredients
+  - Show success message and navigate to saved meal detail or library
+  - _Requirements: 13.7, 13.8, 13.9, 14.5, 14.6, 14.7_
+
+- [x] 24. Integrate meal building flows into the app
+  - Add navigation from FoodSearchView build mode to MealBuilderReviewView
+  - Add navigation from MainCalorieView selection mode to MealBuilderReviewView
+  - Pass selected items (search results or food items) to the review view
+  - Ensure original FoodItems remain in daily log after meal creation (for daily log flow)
+  - Update CustomMealsLibraryView to show newly created meals
+  - Add toast notifications confirming meal creation
+  - Exit build/selection modes after successful meal creation
+  - _Requirements: 13.9, 14.7, 14.8_
+
+- [ ]* 24.1 Write property test for non-destructive meal creation from daily log
+  - **Property 24: Non-Destructive Meal Creation from FoodItems**
+  - **Validates: Requirements 14.8**
+
+- [ ] 25. Final checkpoint - Integration testing and polish
   - Test complete flow: recipe input → AI parsing → review → save → browse → add to log
+  - Test new flow 1: search → select multiple results → build meal → save → verify in library
+  - Test new flow 2: daily log → select items → create meal → save → verify in library
   - Test error scenarios: AI failure → manual entry fallback
   - Test offline scenarios: browse saved meals, add to log, AI disabled
   - Test serving size adjustments with various multipliers
   - Test search and filtering with various queries
-  - Verify all 21 correctness properties pass
+  - Test conversion utilities with various macro combinations
+  - Verify all 24 correctness properties pass
   - Verify 90%+ code coverage achieved
   - Test backward compatibility with existing FoodItems without macros
   - Ask the user if questions arise

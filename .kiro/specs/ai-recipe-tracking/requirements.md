@@ -159,3 +159,35 @@ This feature enables users to create and track custom meals by providing natural
 3. THE System SHALL update search results in real-time as the user types
 4. WHEN no Custom_Meals match the search, THE System SHALL display a message indicating no results
 5. THE System SHALL maintain the sort order (most recently used) within search results
+
+### Requirement 13: Create Custom Meals from Search Results
+
+**User Story:** As a user, I want to create a custom meal by searching for and selecting multiple food items from the nutrition database, so that I can build reusable meals from accurate nutritional data without typing a recipe description.
+
+#### Acceptance Criteria
+
+1. WHEN a user is in the food search view, THE System SHALL provide a "Build Custom Meal" mode
+2. WHEN in build mode, THE System SHALL allow searching for foods using the FatSecret API
+3. WHEN search results are displayed, THE System SHALL show a selection checkbox next to each result
+4. WHEN a user selects search results, THE System SHALL add them to a temporary ingredient list
+5. WHEN a user confirms their selection, THE System SHALL convert each NutritionSearchResult to an Ingredient with all nutritional data preserved
+6. WHEN converting search results to Ingredients, THE System SHALL preserve serving sizes, units, calories, and all macro values
+7. THE System SHALL allow editing ingredient quantities and serving sizes before saving
+8. THE System SHALL prompt for a meal name before saving
+9. WHEN saved, THE Custom_Meal SHALL be immediately available in the custom meals library
+10. THE System SHALL allow users to continue searching and adding more items to the same meal
+
+### Requirement 14: Create Custom Meals from Daily Log Items
+
+**User Story:** As a user, I want to create a custom meal by selecting existing food items from my daily logs, so that I can quickly save meals I've already tracked as reusable templates.
+
+#### Acceptance Criteria
+
+1. WHEN a user views their daily log, THE System SHALL provide an option to select multiple food items
+2. WHEN a user selects food items, THE System SHALL display a "Create Meal from Selection" action
+3. WHEN creating a meal from selected items, THE System SHALL convert each FoodItem to an Ingredient with all nutritional data preserved
+4. WHEN converting FoodItems to Ingredients, THE System SHALL preserve serving sizes, units, and all macro values
+5. WHEN the user confirms, THE System SHALL create a new Custom_Meal with the converted ingredients
+6. THE System SHALL prompt for a meal name before saving
+7. WHEN saved, THE Custom_Meal SHALL be immediately available in the custom meals library
+8. THE System SHALL maintain the original FoodItems in the daily log (non-destructive operation)

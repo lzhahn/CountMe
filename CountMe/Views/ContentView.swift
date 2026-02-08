@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import FirebaseAuth
 
 /// Main content view that serves as the entry point for the calorie tracking application
 ///
@@ -24,11 +25,20 @@ struct ContentView: View {
     /// Scene phase for detecting app foreground/background transitions
     @Environment(\.scenePhase) private var scenePhase
     
+    /// Firebase authentication service from environment
+    @EnvironmentObject var authService: FirebaseAuthService
+    
     /// The calorie tracker business logic instance
     @State private var tracker: CalorieTracker?
     
     /// The custom meal manager business logic instance
     @State private var customMealManager: CustomMealManager?
+    
+    /// The Firebase sync engine for cloud synchronization
+    @State private var syncEngine: FirebaseSyncEngine?
+    
+    /// The data store for local persistence
+    @State private var dataStore: DataStore?
     
     /// Loading state during initialization
     @State private var isLoading = true
@@ -41,20 +51,44 @@ struct ContentView: View {
             if isLoading {
                 // Loading state during initialization
                 ProgressView("Loading...")
-            } else if let tracker = tracker, let customMealManager = customMealManager {
+            } else if let tracker = tracker, 
+                      let customMealManager = customMealManager,
+                      let syncEngine = syncEngine,
+                      let dataStore = dataStore {
                 // Main navigation structure
                 TabView {
                     // Main calorie tracking view
-                    MainCalorieView(tracker: tracker, customMealManager: customMealManager)
-                        .tabItem {
-                            Label("Today", systemImage: "house.fill")
-                        }
+                    MainCalorieView(
+                        tracker: tracker,
+                        customMealManager: customMealManager,
+                        syncEngine: syncEngine,
+                        userId: authService.currentUser?.uid
+                    )
+                    .tabItem {
+                        Label("Today", systemImage: "house.fill")
+                    }
                     
                     // Historical data view
                     HistoricalView(tracker: tracker)
                         .tabItem {
                             Label("History", systemImage: "calendar")
                         }
+                    
+                    // Exercise tracking view
+                    ExerciseTrackerView(tracker: tracker)
+                        .tabItem {
+                            Label("Exercise", systemImage: "figure.walk")
+                        }
+                    
+                    // Profile view
+                    ProfileView(
+                        authService: authService,
+                        syncEngine: syncEngine,
+                        dataStore: dataStore
+                    )
+                    .tabItem {
+                        Label("Profile", systemImage: "person.circle")
+                    }
                 }
             } else {
                 // Error state if initialization fails
@@ -92,7 +126,7 @@ struct ContentView: View {
     /// Initializes the CalorieTracker with dependencies and loads the current day's log
     private func initializeTracker() async {
         // Initialize DataStore with model context
-        let dataStore = DataStore(modelContext: modelContext)
+        let newDataStore = DataStore(modelContext: modelContext)
         
         // Initialize NutritionAPIClient with credentials from Config
         let apiClient = NutritionAPIClient(
@@ -105,16 +139,19 @@ struct ContentView: View {
         
         // Create CalorieTracker instance
         let newTracker = CalorieTracker(
-            dataStore: dataStore,
+            dataStore: newDataStore,
             apiClient: apiClient,
             selectedDate: Date()
         )
         
         // Create CustomMealManager instance
         let newCustomMealManager = CustomMealManager(
-            dataStore: dataStore,
+            dataStore: newDataStore,
             aiParser: aiParser
         )
+        
+        // Create FirebaseSyncEngine instance
+        let newSyncEngine = FirebaseSyncEngine(dataStore: newDataStore)
         
         // Load current day's log
         do {
@@ -124,8 +161,17 @@ struct ContentView: View {
             await MainActor.run {
                 tracker = newTracker
                 customMealManager = newCustomMealManager
+                syncEngine = newSyncEngine
+                dataStore = newDataStore
                 isLoading = false
             }
+            
+            // Run retention policy on app launch if user is authenticated
+            if let userId = authService.currentUser?.uid {
+                print("Running retention policy on app launch for user: \(userId)")
+                newSyncEngine.scheduleRetentionPolicyOnLaunch(userId: userId)
+            }
+            
         } catch {
             print("Failed to load initial log: \(error)")
             
@@ -133,6 +179,8 @@ struct ContentView: View {
             await MainActor.run {
                 tracker = newTracker
                 customMealManager = newCustomMealManager
+                syncEngine = newSyncEngine
+                dataStore = newDataStore
                 isLoading = false
             }
         }
@@ -141,5 +189,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self], inMemory: true)
+        .modelContainer(for: [DailyLog.self, FoodItem.self, ExerciseItem.self, CustomMeal.self, Ingredient.self], inMemory: true)
 }

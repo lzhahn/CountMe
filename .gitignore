@@ -7,5 +7,8 @@ build/
 CountMe/Secrets.swift
 CountMe/Config.local.xcconfig
 
+# Firebase - Uncomment the line below if you want to keep your Firebase config private
+# CountMe/GoogleService-Info.plist
+
 # macOS
 .DS_Store
