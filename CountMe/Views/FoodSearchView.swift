@@ -80,6 +80,9 @@ struct FoodSearchView: View {
     /// Toast style
     @State private var toastStyle: ToastStyle = .success
     
+    /// Controls navigation to barcode scanner
+    @State private var showingBarcodeScanner: Bool = false
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -127,6 +130,12 @@ struct FoodSearchView: View {
                     } else {
                         Menu {
                             Button {
+                                showingBarcodeScanner = true
+                            } label: {
+                                Label("Scan Barcode", systemImage: "barcode.viewfinder")
+                            }
+                            
+                            Button {
                                 showingManualEntry = true
                             } label: {
                                 Label("Manual Entry", systemImage: "pencil.circle")
@@ -147,6 +156,9 @@ struct FoodSearchView: View {
             }
             .sheet(isPresented: $showingManualEntry) {
                 ManualEntryView(tracker: tracker)
+            }
+            .sheet(isPresented: $showingBarcodeScanner) {
+                BarcodeScannerView(tracker: tracker)
             }
             .sheet(item: $selectedResult) { result in
                 ServingAdjustmentView(searchResult: result, tracker: tracker)
@@ -193,9 +205,11 @@ struct FoodSearchView: View {
         .padding(.bottom, 8)
         .onChange(of: selectedTab) { _, _ in
             // Clear search query when switching tabs
+            searchTask?.cancel()
             searchQuery = ""
             searchResults = []
             errorMessage = nil
+            isSearching = false
         }
     }
     
@@ -258,29 +272,43 @@ struct FoodSearchView: View {
                         // Debounce search: cancel previous task and start new one
                         searchTask?.cancel()
                         
-                        guard !newValue.trimmingCharacters(in: .whitespaces).isEmpty else {
+                        let trimmedQuery = newValue.trimmingCharacters(in: .whitespaces)
+                        
+                        guard !trimmedQuery.isEmpty else {
                             searchResults = []
                             errorMessage = nil
+                            isSearching = false
                             return
                         }
+                        
+                        // Show loading immediately when user starts typing
+                        isSearching = true
+                        errorMessage = nil
                         
                         searchTask = Task {
                             // Wait 500ms before searching
                             try? await Task.sleep(nanoseconds: 500_000_000)
                             
-                            // Check if task was cancelled
-                            guard !Task.isCancelled else { return }
+                            // Check if task was cancelled - but don't reset isSearching here
+                            // because a new task may have already started
+                            guard !Task.isCancelled else {
+                                return
+                            }
                             
-                            performSearch()
+                            await MainActor.run {
+                                performSearch()
+                            }
                         }
                     }
                 }
             
             if !searchQuery.isEmpty {
                 Button {
+                    searchTask?.cancel()
                     searchQuery = ""
                     searchResults = []
                     errorMessage = nil
+                    isSearching = false
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)
@@ -656,16 +684,18 @@ struct FoodSearchView: View {
     /// Performs a search using the current query
     private func performSearch() {
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else {
+            isSearching = false
             return
         }
         
         // Check network connectivity before searching
         guard networkMonitor.isConnected else {
             errorMessage = "No internet connection. Please check your network and try again."
+            isSearching = false
             return
         }
         
-        isSearching = true
+        // isSearching is already set to true in onChange, so don't set it again
         errorMessage = nil
         
         Task {

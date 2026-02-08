@@ -13,6 +13,29 @@ CONFIGURATION="Debug"
 BUNDLE_ID="Halu.CountMe"
 APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/CountMe-cclkaybuifejwjgoaltnbcxndjag/Build/Products/Debug-iphonesimulator/CountMe.app"
 
+# Check simulator status and boot if needed
+echo "📱 Checking simulator status..."
+SIMULATOR_STATE=$(xcrun simctl list devices | grep "$SIMULATOR_ID" | sed -E 's/.*\(([^)]+)\)$/\1/')
+
+if [[ "$SIMULATOR_STATE" == "Shutdown" ]]; then
+    echo "🔄 Booting simulator..."
+    xcrun simctl boot "$SIMULATOR_ID"
+    echo "⏳ Waiting for simulator to boot..."
+    sleep 3
+elif [[ "$SIMULATOR_STATE" == "Booted" ]]; then
+    echo "✅ Simulator already running"
+else
+    echo "⚠️  Simulator state: $SIMULATOR_STATE"
+fi
+
+# Open Simulator app if not already open
+if ! pgrep -x "Simulator" > /dev/null; then
+    echo "🖥️  Opening Simulator app..."
+    open -a Simulator
+    sleep 2
+fi
+
+echo ""
 echo "🔨 Building CountMe..."
 xcodebuild -project "$PROJECT" \
     -scheme "$SCHEME" \

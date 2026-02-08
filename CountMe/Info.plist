@@ -15,5 +15,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>CountMe needs camera access to scan product barcodes for quick nutritional information lookup.</string>
 </dict>
 </plist>
