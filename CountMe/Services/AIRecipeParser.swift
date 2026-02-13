@@ -60,29 +60,29 @@ actor AIRecipeParser {
     /// Initializes the AI recipe parser
     /// - Parameters:
     ///   - endpoint: API endpoint URL (defaults to local Ollama server)
-    ///   - modelName: Ollama model name (defaults to llama3.2)
-    ///   - session: URLSession for network requests (defaults to configured session with 30s timeout)
+    ///   - modelName: Ollama model name (defaults to gemma:4b)
+    ///   - session: URLSession for network requests (defaults to configured session with 120s timeout)
     init(
         endpoint: URL? = nil,
-        modelName: String = "gemma3:27b",
+        modelName: String = "gemma3:4b",
         session: URLSession? = nil
     ) {
         self.endpoint = endpoint ?? URL(string: "http://localhost:11434/api/generate")!
         self.modelName = modelName
         
-        // Configure session with 30-second timeout if not provided
+        // Configure session with 120-second timeout if not provided
         if let session = session {
             self.session = session
         } else {
             let configuration = URLSessionConfiguration.default
-            configuration.timeoutIntervalForRequest = 30.0
-            configuration.timeoutIntervalForResource = 30.0
+            configuration.timeoutIntervalForRequest = 120.0
+            configuration.timeoutIntervalForResource = 120.0
             self.session = URLSession(configuration: configuration)
         }
     }
     
     /// Parses a recipe description into structured ingredients with nutritional data
-    /// - Parameter description: Natural language recipe description (10-500 characters)
+    /// - Parameter description: Natural language recipe description (10-2000 characters)
     /// - Returns: ParsedRecipe with ingredients and confidence score
     /// - Throws: AIParserError if parsing fails
     func parseRecipe(description: String) async throws -> ParsedRecipe {
@@ -105,7 +105,7 @@ actor AIRecipeParser {
             throw AIParserError.insufficientData
         }
         
-        guard trimmed.count <= 500 else {
+        guard trimmed.count <= 2000 else {
             throw AIParserError.invalidResponse
         }
         
@@ -371,6 +371,9 @@ actor AIRecipeParser {
     private func extractJSON(from content: String) -> String {
         var cleaned = content.trimmingCharacters(in: .whitespacesAndNewlines)
         
+        logger.debug("=== EXTRACTING JSON - STEP 1: Original ===")
+        logger.debug("\(cleaned)")
+        
         // Remove markdown code blocks if present
         if cleaned.hasPrefix("```json") {
             cleaned = cleaned.replacingOccurrences(of: "```json", with: "")
@@ -381,16 +384,30 @@ actor AIRecipeParser {
         
         cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Try to extract JSON object using regex if mixed content
-        if !cleaned.hasPrefix("{") {
-            let pattern = "\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}"
-            if let regex = try? NSRegularExpression(pattern: pattern, options: []),
-               let match = regex.firstMatch(in: cleaned, options: [], range: NSRange(cleaned.startIndex..., in: cleaned)) {
-                if let range = Range(match.range, in: cleaned) {
-                    cleaned = String(cleaned[range])
-                }
-            }
+        logger.debug("=== EXTRACTING JSON - STEP 2: After markdown removal ===")
+        logger.debug("\(cleaned)")
+        
+        // Try to find JSON object boundaries - look for the outermost braces
+        if let startIndex = cleaned.firstIndex(of: "{"),
+           let endIndex = cleaned.lastIndex(of: "}") {
+            let range = startIndex...endIndex
+            cleaned = String(cleaned[range])
+            
+            logger.debug("=== EXTRACTING JSON - STEP 3: After brace extraction ===")
+            logger.debug("\(cleaned)")
         }
+        
+        // Additional cleanup: remove any leading/trailing text
+        if let firstBrace = cleaned.firstIndex(of: "{") {
+            cleaned = String(cleaned[firstBrace...])
+        }
+        
+        if let lastBrace = cleaned.lastIndex(of: "}") {
+            cleaned = String(cleaned[...lastBrace])
+        }
+        
+        logger.debug("=== EXTRACTING JSON - FINAL ===")
+        logger.debug("\(cleaned)")
         
         return cleaned
     }
@@ -464,32 +481,39 @@ actor AIRecipeParser {
     private func validateIngredient(_ ingredient: AIIngredient) throws {
         // Validate name
         guard !ingredient.name.isEmpty else {
+            logger.error("❌ ERROR: Ingredient has empty name")
             throw AIParserError.insufficientData
         }
         
         // Validate unit is not empty
         guard !ingredient.unit.isEmpty else {
+            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has empty unit")
             throw AIParserError.invalidResponse
         }
         
         // Validate quantity
         guard ingredient.quantity > 0 else {
+            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has invalid quantity: \(ingredient.quantity)")
             throw AIParserError.invalidResponse
         }
         
-        // Validate calories
-        guard ingredient.calories > 0 else {
+        // Validate calories (allow 0 for items like spices/extracts)
+        guard ingredient.calories >= 0 else {
+            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative calories: \(ingredient.calories)")
             throw AIParserError.invalidResponse
         }
         
         // Validate optional macros are non-negative if present
         if let protein = ingredient.protein, protein < 0 {
+            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative protein: \(protein)")
             throw AIParserError.invalidResponse
         }
         if let carbs = ingredient.carbohydrates, carbs < 0 {
+            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative carbs: \(carbs)")
             throw AIParserError.invalidResponse
         }
         if let fats = ingredient.fats, fats < 0 {
+            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative fats: \(fats)")
             throw AIParserError.invalidResponse
         }
     }

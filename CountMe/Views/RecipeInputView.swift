@@ -12,7 +12,7 @@ import SwiftData
 ///
 /// This view provides:
 /// - Multi-line text field for recipe description
-/// - Character count display (10-500 character limit)
+/// - Character count display (10-2000 character limit)
 /// - Parse Recipe button with AI integration
 /// - Loading indicator during AI request
 /// - Error display with retry option
@@ -69,7 +69,7 @@ struct RecipeInputView: View {
     
     /// Whether the recipe description exceeds maximum length
     private var exceedsMaximumLength: Bool {
-        characterCount > 500
+        characterCount > 2000
     }
     
     /// Whether the parse button should be enabled
@@ -257,7 +257,7 @@ struct RecipeInputView: View {
     /// Character count display with validation feedback
     private var characterCountDisplay: some View {
         HStack {
-            Text("\(characterCount) / 500 characters")
+            Text("\(characterCount) / 2000 characters")
                 .font(.caption)
                 .foregroundColor(characterCountColor)
             
@@ -268,7 +268,7 @@ struct RecipeInputView: View {
                     .font(.caption)
                     .foregroundColor(.orange)
             } else if exceedsMaximumLength {
-                Text("Maximum 500 characters")
+                Text("Maximum 2000 characters")
                     .font(.caption)
                     .foregroundColor(.red)
             }
@@ -437,6 +437,12 @@ struct IngredientReviewView: View {
     /// Toast style
     @State private var toastStyle: ToastStyle = .success
     
+    /// Serving count input text
+    @State private var servingCountText: String = "1"
+    
+    /// Serving count validation error
+    @State private var servingCountError: String?
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -453,6 +459,9 @@ struct IngredientReviewView: View {
                 
                 // Add ingredient button
                 addIngredientButton
+                
+                // Serving information section
+                servingInformationSection
                 
                 // Action buttons
                 actionButtons
@@ -626,6 +635,44 @@ struct IngredientReviewView: View {
         }
     }
     
+    /// Serving information section
+    private var servingInformationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Serving Information (Optional)")
+                .font(.headline)
+            
+            HStack {
+                Text("This recipe makes")
+                    .font(.subheadline)
+                
+                TextField("1", text: $servingCountText)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 60)
+                    .multilineTextAlignment(.center)
+                    .onChange(of: servingCountText) { _, newValue in
+                        validateServingCount(newValue)
+                    }
+                
+                Text("servings")
+                    .font(.subheadline)
+            }
+            
+            if let error = servingCountError {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+            
+            Text("Leave as 1 if the entire recipe is one serving")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+    
     /// Action buttons section
     private var actionButtons: some View {
         VStack(spacing: 12) {
@@ -698,10 +745,39 @@ struct IngredientReviewView: View {
         guard !ingredients.isEmpty else { return false }
         
         // All ingredients must be valid
-        return ingredients.allSatisfy { $0.isValid }
+        guard ingredients.allSatisfy({ $0.isValid }) else { return false }
+        
+        // Serving count must be valid (no error)
+        guard servingCountError == nil else { return false }
+        
+        return true
     }
     
     // MARK: - Actions
+    
+    /// Validates the serving count input
+    private func validateServingCount(_ text: String) {
+        // Allow empty (will default to 1.0)
+        if text.isEmpty {
+            servingCountError = nil
+            return
+        }
+        
+        // Try to parse as Double
+        guard let value = Double(text) else {
+            servingCountError = "Must be a valid number"
+            return
+        }
+        
+        // Must be positive and greater than zero
+        if value <= 0 {
+            servingCountError = "Must be greater than 0"
+            return
+        }
+        
+        // Valid
+        servingCountError = nil
+    }
     
     /// Saves the custom meal
     private func saveMeal() {
@@ -721,9 +797,23 @@ struct IngredientReviewView: View {
             return
         }
         
+        // Parse serving count (default to 1.0 if empty or invalid)
+        let servingsCount: Double
+        if servingCountText.isEmpty {
+            servingsCount = 1.0
+        } else if let parsed = Double(servingCountText), parsed > 0 {
+            servingsCount = parsed
+        } else {
+            servingsCount = 1.0
+        }
+        
         Task {
             do {
-                let savedMeal = try await manager.saveCustomMeal(name: trimmedName, ingredients: ingredientModels)
+                let savedMeal = try await manager.saveCustomMeal(
+                    name: trimmedName,
+                    ingredients: ingredientModels,
+                    servingsCount: servingsCount
+                )
                 
                 await MainActor.run {
                     // Close the sheet
@@ -782,8 +872,8 @@ struct EditableIngredient: Identifiable {
             return false
         }
         
-        // Calories must be positive
-        guard let cal = calories, cal > 0 else {
+        // Calories must be non-negative (allow 0 for spices, extracts, etc.)
+        guard let cal = calories, cal >= 0 else {
             return false
         }
         
@@ -1019,8 +1109,8 @@ struct IngredientRowView: View {
     
     private func validateCalories() {
         if let cal = ingredient.calories {
-            if cal <= 0 {
-                ingredient.caloriesError = "Must be > 0"
+            if cal < 0 {
+                ingredient.caloriesError = "Must be >= 0"
             } else {
                 ingredient.caloriesError = nil
             }

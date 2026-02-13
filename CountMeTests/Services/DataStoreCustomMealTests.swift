@@ -99,7 +99,7 @@ struct DataStoreCustomMealTests {
         try await dataStore.saveCustomMeal(meal)
         
         // Fetch by ID
-        let fetchedMeal = try await dataStore.fetchCustomMeal(id: meal.id)
+        let fetchedMeal = try await dataStore.fetchCustomMeal(byId: meal.id)
         
         #expect(fetchedMeal != nil)
         #expect(fetchedMeal?.name == "Pasta Carbonara")
@@ -134,7 +134,7 @@ struct DataStoreCustomMealTests {
         try await dataStore.updateCustomMeal(meal)
         
         // Fetch and verify
-        let fetchedMeal = try await dataStore.fetchCustomMeal(id: meal.id)
+        let fetchedMeal = try await dataStore.fetchCustomMeal(byId: meal.id)
         #expect(fetchedMeal?.name == "Updated Name")
     }
     

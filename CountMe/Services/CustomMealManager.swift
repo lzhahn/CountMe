@@ -140,12 +140,19 @@ final class CustomMealManager {
     /// ```
     ///
     /// **Validates: Requirements 1.5, 2.1, 5.2**
-    func saveCustomMeal(name: String, ingredients: [Ingredient]) async throws -> CustomMeal {
+    func saveCustomMeal(name: String, ingredients: [Ingredient], servingsCount: Double = 1.0) async throws -> CustomMeal {
         isLoading = true
         errorMessage = nil
         
         defer {
             isLoading = false
+        }
+        
+        // Validate servingsCount
+        guard servingsCount > 0 else {
+            let error = ValidationError.invalidServingCount
+            errorMessage = error.localizedDescription
+            throw error
         }
         
         do {
@@ -154,7 +161,7 @@ final class CustomMealManager {
                 ingredients: ingredients,
                 createdAt: Date(),
                 lastUsedAt: Date(),
-                servingsCount: 1.0
+                servingsCount: servingsCount
             )
             
             // Save locally

@@ -381,4 +381,172 @@ final class CustomMealsLibraryViewTests: XCTestCase {
             servingsCount: 1.0
         )
     }
+    
+    // MARK: - Test Serving Information Display (Task 5)
+    
+    func testMealRowDisplaysServingInfoForMultipleServings() async throws {
+        // Create meal with multiple servings
+        let meal = createSampleMeal(name: "Family Recipe", calories: 800)
+        meal.servingsCount = 4.0
+        
+        try await dataStore.saveCustomMeal(meal)
+        await manager.loadAllCustomMeals()
+        
+        // Verify meal has multiple servings
+        await MainActor.run {
+            let loadedMeal = manager.savedMeals.first
+            XCTAssertNotNil(loadedMeal)
+            if let loadedMeal = loadedMeal {
+                XCTAssertTrue(loadedMeal.hasMultipleServings, "Meal should have multiple servings")
+                XCTAssertEqual(loadedMeal.servingsCount, 4.0)
+                
+                // Verify per-serving calculations
+                XCTAssertNotNil(loadedMeal.perServingCalories)
+                XCTAssertEqual(loadedMeal.perServingCalories ?? 0, 200, accuracy: 0.1, "Per-serving calories should be 800/4 = 200")
+            }
+        }
+    }
+    
+    func testMealRowHidesServingInfoForSingleServing() async throws {
+        // Create meal with single serving
+        let meal = createSampleMeal(name: "Single Serving Meal", calories: 400)
+        meal.servingsCount = 1.0
+        
+        try await dataStore.saveCustomMeal(meal)
+        await manager.loadAllCustomMeals()
+        
+        // Verify meal does not have multiple servings
+        await MainActor.run {
+            let loadedMeal = manager.savedMeals.first
+            XCTAssertNotNil(loadedMeal)
+            if let loadedMeal = loadedMeal {
+                XCTAssertFalse(loadedMeal.hasMultipleServings, "Meal should not have multiple servings")
+                XCTAssertEqual(loadedMeal.servingsCount, 1.0)
+                
+                // Verify per-serving values are nil
+                XCTAssertNil(loadedMeal.perServingCalories, "Per-serving calories should be nil for single serving")
+            }
+        }
+    }
+    
+    // MARK: - Test Serving Information Display (Task 5)
+    
+    func testServingCountFormattingWithoutDecimals() async throws {
+        // Create meals with whole number and fractional servings
+        let wholeServingMeal = createSampleMeal(name: "Whole Servings", calories: 600)
+        wholeServingMeal.servingsCount = 4.0
+        
+        let fractionalServingMeal = createSampleMeal(name: "Fractional Servings", calories: 650)
+        fractionalServingMeal.servingsCount = 4.5
+        
+        try await dataStore.saveCustomMeal(wholeServingMeal)
+        try await dataStore.saveCustomMeal(fractionalServingMeal)
+        await manager.loadAllCustomMeals()
+        
+        // Verify serving counts
+        await MainActor.run {
+            XCTAssertEqual(manager.savedMeals.count, 2)
+            
+            let wholeMeal = manager.savedMeals.first { $0.name == "Whole Servings" }
+            let fractionalMeal = manager.savedMeals.first { $0.name == "Fractional Servings" }
+            
+            XCTAssertNotNil(wholeMeal)
+            XCTAssertNotNil(fractionalMeal)
+            
+            if let wholeMeal = wholeMeal {
+                // Whole number should display without decimals (4 not 4.0)
+                XCTAssertEqual(wholeMeal.servingsCount, 4.0)
+                XCTAssertEqual(wholeMeal.servingsCount.truncatingRemainder(dividingBy: 1), 0, "Should be whole number")
+            }
+            
+            if let fractionalMeal = fractionalMeal {
+                // Fractional number should display with decimals (4.5)
+                XCTAssertEqual(fractionalMeal.servingsCount, 4.5)
+                XCTAssertNotEqual(fractionalMeal.servingsCount.truncatingRemainder(dividingBy: 1), 0, "Should have fractional part")
+            }
+        }
+    }
+    
+    func testPerServingCaloriesCalculation() async throws {
+        // Create meal with known values
+        let meal = createSampleMeal(name: "Test Meal", calories: 1000)
+        meal.servingsCount = 5.0
+        
+        try await dataStore.saveCustomMeal(meal)
+        await manager.loadAllCustomMeals()
+        
+        // Verify per-serving calculation
+        await MainActor.run {
+            let loadedMeal = manager.savedMeals.first
+            XCTAssertNotNil(loadedMeal)
+            if let loadedMeal = loadedMeal {
+                XCTAssertEqual(loadedMeal.totalCalories, 1000, accuracy: 0.1)
+                if let perServingCal = loadedMeal.perServingCalories {
+                    XCTAssertEqual(perServingCal, 200, accuracy: 0.1, "1000 calories / 5 servings = 200 cal/serving")
+                } else {
+                    XCTFail("Per-serving calories should not be nil")
+                }
+            }
+        }
+    }
+    
+    func testPerServingMacrosCalculation() async throws {
+        // Create meal with known macro values
+        let ingredients = [
+            Ingredient(name: "Ingredient", quantity: 1, unit: "batch", calories: 800, protein: 40, carbohydrates: 80, fats: 20)
+        ]
+        let meal = CustomMeal(name: "Macro Test Meal", ingredients: ingredients, servingsCount: 4.0)
+        
+        try await dataStore.saveCustomMeal(meal)
+        await manager.loadAllCustomMeals()
+        
+        // Verify per-serving macro calculations
+        await MainActor.run {
+            let loadedMeal = manager.savedMeals.first
+            XCTAssertNotNil(loadedMeal)
+            if let loadedMeal = loadedMeal {
+                XCTAssertTrue(loadedMeal.hasMultipleServings)
+                
+                // Total values
+                XCTAssertEqual(loadedMeal.totalCalories, 800, accuracy: 0.1)
+                XCTAssertEqual(loadedMeal.totalProtein, 40, accuracy: 0.1)
+                XCTAssertEqual(loadedMeal.totalCarbohydrates, 80, accuracy: 0.1)
+                XCTAssertEqual(loadedMeal.totalFats, 20, accuracy: 0.1)
+                
+                // Per-serving values (divided by 4)
+                if let perServingCal = loadedMeal.perServingCalories {
+                    XCTAssertEqual(perServingCal, 200, accuracy: 0.1)
+                }
+                if let perServingProtein = loadedMeal.perServingProtein {
+                    XCTAssertEqual(perServingProtein, 10, accuracy: 0.1)
+                }
+                if let perServingCarbs = loadedMeal.perServingCarbohydrates {
+                    XCTAssertEqual(perServingCarbs, 20, accuracy: 0.1)
+                }
+                if let perServingFats = loadedMeal.perServingFats {
+                    XCTAssertEqual(perServingFats, 5, accuracy: 0.1)
+                }
+            }
+        }
+    }
+    
+    func testBackwardCompatibilityWithDefaultServingCount() async throws {
+        // Create meal without explicitly setting servingsCount (should default to 1.0)
+        let meal = createSampleMeal(name: "Legacy Meal", calories: 500)
+        // Don't set servingsCount - it should default to 1.0
+        
+        try await dataStore.saveCustomMeal(meal)
+        await manager.loadAllCustomMeals()
+        
+        // Verify backward compatibility
+        await MainActor.run {
+            let loadedMeal = manager.savedMeals.first
+            XCTAssertNotNil(loadedMeal)
+            if let loadedMeal = loadedMeal {
+                XCTAssertEqual(loadedMeal.servingsCount, 1.0, "Should default to 1.0 serving")
+                XCTAssertFalse(loadedMeal.hasMultipleServings, "Should not show as multiple servings")
+                XCTAssertNil(loadedMeal.perServingCalories, "Should not calculate per-serving for single serving")
+            }
+        }
+    }
 }

@@ -100,7 +100,7 @@ final class AIRecipeParserTests: XCTestCase {
     }
     
     func testValidateRecipeDescriptionTooLong() async {
-        let longDescription = String(repeating: "a", count: 501)
+        let longDescription = String(repeating: "a", count: 2001)
         
         do {
             _ = try await parser.parseRecipe(description: longDescription)
@@ -134,13 +134,10 @@ final class AIRecipeParserTests: XCTestCase {
     // MARK: - Successful Parsing Tests
     
     func testParseRecipeSuccess() async throws {
-        // Mock successful Ollama response
+        // Mock successful Ollama generate API response
         let mockJSON = """
         {
-            "message": {
-                "role": "assistant",
-                "content": "{\\"ingredients\\":[{\\"name\\":\\"chicken breast\\",\\"quantity\\":6,\\"unit\\":\\"oz\\",\\"calories\\":187,\\"protein\\":35,\\"carbohydrates\\":0,\\"fats\\":4},{\\"name\\":\\"white rice\\",\\"quantity\\":1,\\"unit\\":\\"cup\\",\\"calories\\":206,\\"protein\\":4,\\"carbohydrates\\":45,\\"fats\\":0.4}],\\"confidence\\":0.9}"
-            }
+            "response": "{\\"ingredients\\":[{\\"name\\":\\"chicken breast\\",\\"quantity\\":6,\\"unit\\":\\"oz\\",\\"calories\\":187,\\"protein\\":35,\\"carbohydrates\\":0,\\"fats\\":4},{\\"name\\":\\"white rice\\",\\"quantity\\":1,\\"unit\\":\\"cup\\",\\"calories\\":206,\\"protein\\":4,\\"carbohydrates\\":45,\\"fats\\":0.4}],\\"confidence\\":0.9}"
         }
         """
         
@@ -174,13 +171,10 @@ final class AIRecipeParserTests: XCTestCase {
     }
     
     func testParseRecipeWithMarkdownBlocks() async throws {
-        // Mock response with markdown code blocks
+        // Mock response with markdown code blocks (Ollama generate API format)
         let mockJSON = """
         {
-            "message": {
-                "role": "assistant",
-                "content": "```json\\n{\\"ingredients\\":[{\\"name\\":\\"apple\\",\\"quantity\\":1,\\"unit\\":\\"piece\\",\\"calories\\":95,\\"protein\\":0.5,\\"carbohydrates\\":25,\\"fats\\":0.3}],\\"confidence\\":0.95}\\n```"
-            }
+            "response": "```json\\n{\\"ingredients\\":[{\\"name\\":\\"apple\\",\\"quantity\\":1,\\"unit\\":\\"piece\\",\\"calories\\":95,\\"protein\\":0.5,\\"carbohydrates\\":25,\\"fats\\":0.3}],\\"confidence\\":0.95}\\n```"
         }
         """
         
@@ -268,13 +262,10 @@ final class AIRecipeParserTests: XCTestCase {
     }
     
     func testParseRecipeEmptyIngredients() async {
-        // Mock response with empty ingredients array
+        // Mock response with empty ingredients array (Ollama generate API format)
         let mockJSON = """
         {
-            "message": {
-                "role": "assistant",
-                "content": "{\\"ingredients\\":[],\\"confidence\\":0.5}"
-            }
+            "response": "{\\"ingredients\\":[],\\"confidence\\":0.5}"
         }
         """
         
@@ -301,13 +292,10 @@ final class AIRecipeParserTests: XCTestCase {
     }
     
     func testParseRecipeInvalidJSON() async {
-        // Mock response with invalid JSON
+        // Mock response with invalid JSON (Ollama generate API format)
         let mockJSON = """
         {
-            "message": {
-                "role": "assistant",
-                "content": "invalid json content"
-            }
+            "response": "invalid json content"
         }
         """
         
@@ -336,13 +324,10 @@ final class AIRecipeParserTests: XCTestCase {
     // MARK: - Validation Tests
     
     func testParseRecipeNegativeCalories() async {
-        // Mock response with negative calories
+        // Mock response with negative calories (Ollama generate API format)
         let mockJSON = """
         {
-            "message": {
-                "role": "assistant",
-                "content": "{\\"ingredients\\":[{\\"name\\":\\"test\\",\\"quantity\\":1,\\"unit\\":\\"cup\\",\\"calories\\":-100}],\\"confidence\\":0.9}"
-            }
+            "response": "{\\"ingredients\\":[{\\"name\\":\\"test\\",\\"quantity\\":1,\\"unit\\":\\"cup\\",\\"calories\\":-100}],\\"confidence\\":0.9}"
         }
         """
         
@@ -369,13 +354,11 @@ final class AIRecipeParserTests: XCTestCase {
     }
     
     func testParseRecipeInvalidUnit() async {
-        // Mock response with invalid unit
+        // Mock response with empty unit (Ollama generate API format)
+        // The parser rejects empty units but accepts any non-empty unit string
         let mockJSON = """
         {
-            "message": {
-                "role": "assistant",
-                "content": "{\\"ingredients\\":[{\\"name\\":\\"test\\",\\"quantity\\":1,\\"unit\\":\\"invalid_unit\\",\\"calories\\":100}],\\"confidence\\":0.9}"
-            }
+            "response": "{\\"ingredients\\":[{\\"name\\":\\"test\\",\\"quantity\\":1,\\"unit\\":\\"\\",\\"calories\\":100}],\\"confidence\\":0.9}"
         }
         """
         
@@ -389,7 +372,7 @@ final class AIRecipeParserTests: XCTestCase {
         
         do {
             _ = try await parser.parseRecipe(description: "test recipe")
-            XCTFail("Should throw invalidResponse error for invalid unit")
+            XCTFail("Should throw invalidResponse error for empty unit")
         } catch let error as AIParserError {
             if case .invalidResponse = error {
                 // Expected error

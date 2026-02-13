@@ -55,11 +55,25 @@ struct CustomMealDetailView: View {
     /// Toast style
     @State private var toastStyle: ToastStyle = .success
     
+    /// Controls edit mode for serving count
+    @State private var isEditingServingCount: Bool = false
+    
+    /// Text field for editing serving count
+    @State private var servingCountText: String = ""
+    
+    /// Validation error for serving count
+    @State private var servingCountError: String? = nil
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Header section
                 headerSection
+                
+                // Serving information (only if multiple servings)
+                if meal.hasMultipleServings {
+                    servingInformationSection
+                }
                 
                 // Serving size adjustment
                 servingSizeSection
@@ -134,10 +148,149 @@ struct CustomMealDetailView: View {
         }
     }
     
+    /// Serving information section (only shown when meal has multiple servings)
+    private var servingInformationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Serving Information")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button {
+                    if isEditingServingCount {
+                        // Save changes
+                        saveServingCount()
+                    } else {
+                        // Enter edit mode
+                        servingCountText = formatServingCount(meal.servingsCount)
+                        servingCountError = nil
+                        isEditingServingCount = true
+                    }
+                } label: {
+                    Text(isEditingServingCount ? "Save" : "Edit")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                }
+                
+                if isEditingServingCount {
+                    Button("Cancel") {
+                        isEditingServingCount = false
+                        servingCountError = nil
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                // Makes X servings text or edit field
+                if isEditingServingCount {
+                    HStack {
+                        Text("This recipe makes")
+                            .font(.subheadline)
+                        
+                        TextField("1", text: $servingCountText)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 60)
+                            .onChange(of: servingCountText) { _, newValue in
+                                validateServingCountInput(newValue)
+                            }
+                        
+                        Text("servings")
+                            .font(.subheadline)
+                    }
+                    
+                    if let error = servingCountError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                } else {
+                    Text("Makes \(formatServingCount(meal.servingsCount)) servings")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
+                
+                // Per-serving nutrition box
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Per Serving:")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    VStack(spacing: 8) {
+                        // Calories per serving
+                        if let perServingCal = meal.perServingCalories {
+                            HStack {
+                                Text("Calories")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.0f cal", perServingCal))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        
+                        // Protein per serving
+                        if let perServingProtein = meal.perServingProtein, perServingProtein > 0 {
+                            HStack {
+                                Text("Protein")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.1f g", perServingProtein))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        
+                        // Carbs per serving
+                        if let perServingCarbs = meal.perServingCarbohydrates, perServingCarbs > 0 {
+                            HStack {
+                                Text("Carbohydrates")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.1f g", perServingCarbs))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        
+                        // Fats per serving
+                        if let perServingFats = meal.perServingFats, perServingFats > 0 {
+                            HStack {
+                                Text("Fats")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.1f g", perServingFats))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
+            }
+        }
+    }
+    
+    /// Helper to format serving count without unnecessary decimals
+    private func formatServingCount(_ count: Double) -> String {
+        if count.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(Int(count))
+        } else {
+            return String(format: "%.1f", count)
+        }
+    }
+    
     /// Serving size adjustment section
     private var servingSizeSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Serving Size")
+            Text("How many servings?")
                 .font(.headline)
             
             HStack {
@@ -163,18 +316,138 @@ struct CustomMealDetailView: View {
             .background(Color(.systemGray6))
             .cornerRadius(10)
             
-            if servingMultiplier != 1.0 {
-                Text("Nutritional values are adjusted based on serving size")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            // Show per-serving nutrition if available
+            if meal.hasMultipleServings {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Per Serving:")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    VStack(spacing: 8) {
+                        // Calories per serving
+                        if let perServingCal = meal.perServingCalories {
+                            HStack {
+                                Text("Calories")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.0f cal", perServingCal))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        
+                        // Protein per serving
+                        if let perServingProtein = meal.perServingProtein, perServingProtein > 0 {
+                            HStack {
+                                Text("Protein")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.1f g", perServingProtein))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        
+                        // Carbs per serving
+                        if let perServingCarbs = meal.perServingCarbohydrates, perServingCarbs > 0 {
+                            HStack {
+                                Text("Carbohydrates")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.1f g", perServingCarbs))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        
+                        // Fats per serving
+                        if let perServingFats = meal.perServingFats, perServingFats > 0 {
+                            HStack {
+                                Text("Fats")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.1f g", perServingFats))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
             }
+            
+            // Show total consumed nutrition
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Total (\(formatServingCount(servingMultiplier)) servings):")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                VStack(spacing: 8) {
+                    // Total calories consumed
+                    HStack {
+                        Text("Calories")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(String(format: "%.0f cal", totalConsumedCalories))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    // Total protein consumed
+                    if meal.totalProtein > 0 {
+                        HStack {
+                            Text("Protein")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(String(format: "%.1f g", totalConsumedProtein))
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    // Total carbs consumed
+                    if meal.totalCarbohydrates > 0 {
+                        HStack {
+                            Text("Carbohydrates")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(String(format: "%.1f g", totalConsumedCarbs))
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.green)
+                        }
+                    }
+                    
+                    // Total fats consumed
+                    if meal.totalFats > 0 {
+                        HStack {
+                            Text("Fats")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(String(format: "%.1f g", totalConsumedFats))
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(10)
         }
     }
     
     /// Nutritional summary section with adjusted values
     private var nutritionalSummarySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Nutritional Information")
+            Text(meal.hasMultipleServings ? "Total Recipe" : "Nutritional Information")
                 .font(.headline)
             
             VStack(spacing: 12) {
@@ -217,7 +490,7 @@ struct CustomMealDetailView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(meal.hasMultipleServings ? Color.blue.opacity(0.1) : Color(.systemGray6))
             .cornerRadius(10)
         }
     }
@@ -371,7 +644,106 @@ struct CustomMealDetailView: View {
         }
     }
     
+    // MARK: - Computed Properties
+    
+    /// Total calories consumed based on serving multiplier
+    private var totalConsumedCalories: Double {
+        (meal.totalCalories / meal.servingsCount) * servingMultiplier
+    }
+    
+    /// Total protein consumed based on serving multiplier
+    private var totalConsumedProtein: Double {
+        (meal.totalProtein / meal.servingsCount) * servingMultiplier
+    }
+    
+    /// Total carbohydrates consumed based on serving multiplier
+    private var totalConsumedCarbs: Double {
+        (meal.totalCarbohydrates / meal.servingsCount) * servingMultiplier
+    }
+    
+    /// Total fats consumed based on serving multiplier
+    private var totalConsumedFats: Double {
+        (meal.totalFats / meal.servingsCount) * servingMultiplier
+    }
+    
     // MARK: - Actions
+    
+    /// Validates serving count input
+    private func validateServingCountInput(_ text: String) {
+        // Clear error if empty (will use default)
+        if text.isEmpty {
+            servingCountError = nil
+            return
+        }
+        
+        // Try to parse as Double
+        guard let value = Double(text) else {
+            servingCountError = "Must be a valid number"
+            return
+        }
+        
+        // Validate positive and greater than zero
+        if value <= 0 {
+            servingCountError = "Must be greater than zero"
+            return
+        }
+        
+        // Valid input
+        servingCountError = nil
+    }
+    
+    /// Saves the edited serving count
+    private func saveServingCount() {
+        // Validate input
+        let trimmedText = servingCountText.trimmingCharacters(in: .whitespaces)
+        
+        // Default to 1.0 if empty
+        let newServingCount: Double
+        if trimmedText.isEmpty {
+            newServingCount = 1.0
+        } else {
+            guard let value = Double(trimmedText), value > 0 else {
+                servingCountError = "Serving count must be a positive number greater than zero"
+                return
+            }
+            newServingCount = value
+        }
+        
+        // Check if value actually changed
+        if newServingCount == meal.servingsCount {
+            isEditingServingCount = false
+            return
+        }
+        
+        // Update the meal
+        Task {
+            do {
+                // Update servingsCount
+                meal.servingsCount = newServingCount
+                
+                // Save to database
+                try await manager.updateCustomMeal(meal)
+                
+                // Exit edit mode
+                await MainActor.run {
+                    isEditingServingCount = false
+                    servingCountError = nil
+                    
+                    // Show success toast
+                    toastMessage = "Serving count updated successfully"
+                    toastStyle = .success
+                    withAnimation {
+                        showingToast = true
+                    }
+                }
+            } catch {
+                // Show error
+                await MainActor.run {
+                    servingCountError = manager.errorMessage ?? "Unable to update serving count"
+                }
+            }
+        }
+    }
     
     /// Adds the custom meal to today's daily log
     private func addToToday() {

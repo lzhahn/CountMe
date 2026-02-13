@@ -168,6 +168,9 @@ enum ValidationError: Error, LocalizedError {
     /// A required field is missing or empty
     case missingRequiredField(fieldName: String)
     
+    /// A serving count is invalid (zero, negative, or non-numeric)
+    case invalidServingCount
+    
     var errorDescription: String? {
         switch self {
         case .negativeValue(let fieldName, let value):
@@ -176,6 +179,8 @@ enum ValidationError: Error, LocalizedError {
             return "\(fieldName) must be greater than zero (received: \(value))"
         case .missingRequiredField(let fieldName):
             return "\(fieldName) is required and cannot be empty"
+        case .invalidServingCount:
+            return "Serving count must be a positive number greater than zero"
         }
     }
 }

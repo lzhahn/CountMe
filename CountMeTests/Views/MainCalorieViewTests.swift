@@ -60,11 +60,11 @@ struct MainCalorieViewTests {
     @Test("Selection mode tracks selected items")
     func testSelectionTracking() async throws {
         // Create a set to simulate selection tracking
-        var selectedItems: Set<UUID> = []
+        var selectedItems: Set<String> = []
         
-        let item1Id = UUID()
-        let item2Id = UUID()
-        let item3Id = UUID()
+        let item1Id = UUID().uuidString
+        let item2Id = UUID().uuidString
+        let item3Id = UUID().uuidString
         
         // Simulate selecting items
         selectedItems.insert(item1Id)
@@ -150,7 +150,7 @@ struct MainCalorieViewTests {
         }
         
         // Simulate selecting multiple items
-        var selectedItems: Set<UUID> = []
+        var selectedItems: Set<String> = []
         
         if let foodItems = await MainActor.run(body: { tracker.currentLog?.foodItems }) {
             // Select first 3 items
@@ -164,9 +164,9 @@ struct MainCalorieViewTests {
     
     @Test("Selection count is accurate")
     func testSelectionCount() async throws {
-        var selectedItems: Set<UUID> = []
+        var selectedItems: Set<String> = []
         
-        let ids = [UUID(), UUID(), UUID(), UUID(), UUID()]
+        let ids = [UUID().uuidString, UUID().uuidString, UUID().uuidString, UUID().uuidString, UUID().uuidString]
         
         // Add items one by one and verify count
         for (index, id) in ids.enumerated() {
@@ -203,13 +203,13 @@ struct MainCalorieViewTests {
     
     @Test("Exiting selection mode clears selections")
     func testExitSelectionModeClearsSelections() async throws {
-        var selectedItems: Set<UUID> = []
+        var selectedItems: Set<String> = []
         var isSelectionMode = true
         
         // Add some selections
-        selectedItems.insert(UUID())
-        selectedItems.insert(UUID())
-        selectedItems.insert(UUID())
+        selectedItems.insert(UUID().uuidString)
+        selectedItems.insert(UUID().uuidString)
+        selectedItems.insert(UUID().uuidString)
         
         #expect(selectedItems.count == 3)
         #expect(isSelectionMode == true)
@@ -224,7 +224,7 @@ struct MainCalorieViewTests {
     
     @Test("Create Meal button only shows when items are selected")
     func testCreateMealButtonVisibility() async throws {
-        var selectedItems: Set<UUID> = []
+        var selectedItems: Set<String> = []
         let isSelectionMode = true
         
         // Initially no items selected
@@ -235,7 +235,7 @@ struct MainCalorieViewTests {
         #expect(shouldShowButton == false)
         
         // Select an item
-        selectedItems.insert(UUID())
+        selectedItems.insert(UUID().uuidString)
         
         // Create Meal button should now show
         let shouldShowButtonNow = isSelectionMode && !selectedItems.isEmpty
@@ -334,7 +334,7 @@ struct MainCalorieViewTests {
         #expect(foodItems.count == 2)
         
         // Simulate selecting both items
-        var selectedItems: Set<UUID> = []
+        var selectedItems: Set<String> = []
         for item in foodItems {
             selectedItems.insert(item.id)
         }

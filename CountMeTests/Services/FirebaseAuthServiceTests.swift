@@ -81,6 +81,9 @@ struct FirebaseAuthServiceTests {
         // For unit testing without actual Firebase connection, we verify the method doesn't throw
         try await authService.signOut()
         
+        // Wait briefly for the auth state listener to propagate the sign-out
+        try await Task.sleep(nanoseconds: 500_000_000)
+        
         // Verify currentUser is nil after sign out
         let currentUser = await authService.currentUser
         #expect(currentUser == nil)

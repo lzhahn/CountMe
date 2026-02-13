@@ -383,7 +383,8 @@ struct CustomMealsLibraryView: View {
 ///
 /// Shows:
 /// - Meal name
-/// - Total calories and macro summary
+/// - Serving information (when hasMultipleServings)
+/// - Total calories and macro summary (or per-serving + total when hasMultipleServings)
 /// - Creation date
 /// - Last used date
 struct CustomMealRow: View {
@@ -397,14 +398,26 @@ struct CustomMealRow: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            // Nutritional summary
+            // Serving information (only show when hasMultipleServings)
+            if meal.hasMultipleServings {
+                Text("Makes \(formattedServingCount(meal.servingsCount)) servings")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Calorie information
+            if meal.hasMultipleServings, let perServingCal = meal.perServingCalories {
+                Text("\(Int(perServingCal)) cal/serving • \(Int(meal.totalCalories)) cal total")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+            } else {
+                Text("\(Int(meal.totalCalories)) cal")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+            }
+            
+            // Nutritional summary (macros)
             HStack(spacing: 16) {
-                nutritionalBadge(
-                    value: Int(meal.totalCalories),
-                    unit: "cal",
-                    color: .blue
-                )
-                
                 if meal.totalProtein > 0 {
                     nutritionalBadge(
                         value: Int(meal.totalProtein),
@@ -478,6 +491,21 @@ struct CustomMealRow: View {
         .background(color.opacity(0.1))
         .cornerRadius(6)
     }
+    
+    /// Formats serving count without unnecessary decimals
+    ///
+    /// - Parameter count: The serving count to format
+    /// - Returns: Formatted string (e.g., "4" instead of "4.0")
+    private func formattedServingCount(_ count: Double) -> String {
+        // Check if the count has a fractional part
+        if count.truncatingRemainder(dividingBy: 1) == 0 {
+            // No fractional part, show as integer
+            return String(Int(count))
+        } else {
+            // Has fractional part, show with decimals
+            return String(format: "%.1f", count)
+        }
+    }
 }
 
 // MARK: - Preview
@@ -503,7 +531,8 @@ struct CustomMealRow: View {
             Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
         ],
         createdAt: Date().addingTimeInterval(-86400 * 7),
-        lastUsedAt: Date().addingTimeInterval(-3600)
+        lastUsedAt: Date().addingTimeInterval(-3600),
+        servingsCount: 4.0  // Multiple servings
     )
     
     let sampleMeal2 = CustomMeal(
@@ -514,10 +543,23 @@ struct CustomMealRow: View {
             Ingredient(name: "Almond Milk", quantity: 1, unit: "cup", calories: 30, protein: 1, carbohydrates: 1, fats: 2.5)
         ],
         createdAt: Date().addingTimeInterval(-86400 * 3),
-        lastUsedAt: Date().addingTimeInterval(-7200)
+        lastUsedAt: Date().addingTimeInterval(-7200),
+        servingsCount: 1.0  // Single serving
     )
     
-    manager.savedMeals = [sampleMeal1, sampleMeal2]
+    let sampleMeal3 = CustomMeal(
+        name: "Pasta Salad",
+        ingredients: [
+            Ingredient(name: "Pasta", quantity: 2, unit: "cups", calories: 400, protein: 14, carbohydrates: 80, fats: 2),
+            Ingredient(name: "Cherry Tomatoes", quantity: 1, unit: "cup", calories: 27, protein: 1.3, carbohydrates: 6, fats: 0.3),
+            Ingredient(name: "Olive Oil", quantity: 2, unit: "tbsp", calories: 240, protein: 0, carbohydrates: 0, fats: 28)
+        ],
+        createdAt: Date().addingTimeInterval(-86400 * 2),
+        lastUsedAt: Date().addingTimeInterval(-1800),
+        servingsCount: 6.5  // Fractional servings
+    )
+    
+    manager.savedMeals = [sampleMeal1, sampleMeal2, sampleMeal3]
     
     return CustomMealsLibraryView(manager: manager, onDismissAll: nil)
 }

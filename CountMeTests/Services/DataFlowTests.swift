@@ -7,9 +7,11 @@
 
 import Testing
 import SwiftData
+import Foundation
 @testable import CountMe
 
 @Suite("Data Flow Tests")
+@MainActor
 struct DataFlowTests {
     
     @Test("Food item appears in daily log after adding")

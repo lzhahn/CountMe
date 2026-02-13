@@ -322,7 +322,7 @@ struct CustomMealDetailViewTests {
         try await dataStore.saveCustomMeal(meal)
         
         // Verify meal exists
-        let fetchedMeal = try await dataStore.fetchCustomMeal(id: meal.id)
+        let fetchedMeal = try await dataStore.fetchCustomMeal(byId: meal.id)
         #expect(fetchedMeal != nil)
         
         // Delete meal (must be on main actor)
@@ -334,7 +334,7 @@ struct CustomMealDetailViewTests {
         try await deleteMeal()
         
         // Verify meal is deleted
-        let deletedMeal = try await dataStore.fetchCustomMeal(id: meal.id)
+        let deletedMeal = try await dataStore.fetchCustomMeal(byId: meal.id)
         #expect(deletedMeal == nil)
     }
     

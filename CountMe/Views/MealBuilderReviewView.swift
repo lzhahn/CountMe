@@ -58,11 +58,22 @@ struct MealBuilderReviewView: View {
     /// Toast style
     @State private var toastStyle: ToastStyle = .success
     
+    /// Serving count input text
+    @State private var servingCountText: String = "1"
+    
+    /// Serving count validation error
+    @State private var servingCountError: String?
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Meal name input section
                 mealNameSection
+                
+                Divider()
+                
+                // Serving count input section
+                servingCountSection
                 
                 Divider()
                 
@@ -116,6 +127,35 @@ struct MealBuilderReviewView: View {
                 .autocorrectionDisabled()
             
             if let error = validationError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+        .padding()
+    }
+    
+    /// Serving count input section
+    private var servingCountSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Serving Information (Optional)")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+            
+            HStack {
+                Text("This recipe makes")
+                TextField("1", text: $servingCountText)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 60)
+                    .onChange(of: servingCountText) { _, newValue in
+                        validateServingCount(newValue)
+                    }
+                Text("servings")
+            }
+            
+            if let error = servingCountError {
                 Text(error)
                     .font(.caption)
                     .foregroundColor(.red)
@@ -252,6 +292,24 @@ struct MealBuilderReviewView: View {
         }
     }
     
+    /// Validates the serving count input
+    private func validateServingCount(_ text: String) {
+        // Clear error if empty (will default to 1.0)
+        guard !text.isEmpty else {
+            servingCountError = nil
+            return
+        }
+        
+        // Try to parse as Double
+        guard let count = Double(text), count > 0 else {
+            servingCountError = "Serving count must be a positive number"
+            return
+        }
+        
+        // Valid
+        servingCountError = nil
+    }
+    
     /// Validates and saves the custom meal
     private func saveMeal() {
         // Validate meal name
@@ -272,13 +330,31 @@ struct MealBuilderReviewView: View {
             return
         }
         
+        // Validate serving count
+        guard servingCountError == nil else {
+            validationError = "Please fix serving count error"
+            return
+        }
+        
+        // Parse serving count (default to 1.0 if empty or invalid)
+        let servingsCount: Double
+        if let parsed = Double(servingCountText), parsed > 0 {
+            servingsCount = parsed
+        } else {
+            servingsCount = 1.0
+        }
+        
         // Clear validation error
         validationError = nil
         isSaving = true
         
         Task {
             do {
-                _ = try await manager.saveCustomMeal(name: trimmedName, ingredients: ingredients)
+                _ = try await manager.saveCustomMeal(
+                    name: trimmedName,
+                    ingredients: ingredients,
+                    servingsCount: servingsCount
+                )
                 
                 await MainActor.run {
                     isSaving = false

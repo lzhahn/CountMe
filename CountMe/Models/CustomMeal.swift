@@ -236,3 +236,61 @@ extension CustomMeal {
         )
     }
 }
+
+// MARK: - Per-Serving Nutrition
+
+extension CustomMeal {
+    /// Per-serving calories (nil if servingsCount ≤ 1)
+    ///
+    /// Calculates calories per serving by dividing total calories by servingsCount.
+    /// Returns nil when servingsCount ≤ 1 to avoid redundant display (entire recipe = 1 serving).
+    ///
+    /// - Returns: Calories per serving, or nil if servingsCount ≤ 1
+    var perServingCalories: Double? {
+        guard servingsCount > 1 else { return nil }
+        return totalCalories / servingsCount
+    }
+    
+    /// Per-serving protein in grams (nil if servingsCount ≤ 1)
+    ///
+    /// Calculates protein per serving by dividing total protein by servingsCount.
+    /// Returns nil when servingsCount ≤ 1 to avoid redundant display.
+    ///
+    /// - Returns: Protein per serving in grams, or nil if servingsCount ≤ 1
+    var perServingProtein: Double? {
+        guard servingsCount > 1 else { return nil }
+        return totalProtein / servingsCount
+    }
+    
+    /// Per-serving carbohydrates in grams (nil if servingsCount ≤ 1)
+    ///
+    /// Calculates carbohydrates per serving by dividing total carbohydrates by servingsCount.
+    /// Returns nil when servingsCount ≤ 1 to avoid redundant display.
+    ///
+    /// - Returns: Carbohydrates per serving in grams, or nil if servingsCount ≤ 1
+    var perServingCarbohydrates: Double? {
+        guard servingsCount > 1 else { return nil }
+        return totalCarbohydrates / servingsCount
+    }
+    
+    /// Per-serving fats in grams (nil if servingsCount ≤ 1)
+    ///
+    /// Calculates fats per serving by dividing total fats by servingsCount.
+    /// Returns nil when servingsCount ≤ 1 to avoid redundant display.
+    ///
+    /// - Returns: Fats per serving in grams, or nil if servingsCount ≤ 1
+    var perServingFats: Double? {
+        guard servingsCount > 1 else { return nil }
+        return totalFats / servingsCount
+    }
+    
+    /// Indicates whether the meal has multiple servings defined
+    ///
+    /// Used to conditionally display per-serving nutrition in UI.
+    /// When false (servingsCount ≤ 1), per-serving display is redundant.
+    ///
+    /// - Returns: True if servingsCount > 1, false otherwise
+    var hasMultipleServings: Bool {
+        servingsCount > 1
+    }
+}
