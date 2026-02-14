@@ -5,6 +5,9 @@
       "command": "npx",
       "args": [
         "@playwright/mcp@latest"
+      ],
+      "autoApprove": [
+        "browser_wait_for"
       ]
     },
     "memory": {

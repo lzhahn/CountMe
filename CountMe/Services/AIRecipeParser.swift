@@ -2,7 +2,7 @@
 //  AIRecipeParser.swift
 //  CountMe
 //
-//  Actor for AI-powered recipe parsing using Ollama (local LLM)
+//  Actor for AI-powered recipe parsing using Google Gemini API
 //
 
 import Foundation
@@ -15,6 +15,7 @@ enum AIParserError: Error, LocalizedError {
     case parsingFailed
     case timeout
     case insufficientData
+    case rateLimited
     
     /// Provides user-friendly error descriptions
     var errorDescription: String? {
@@ -29,6 +30,8 @@ enum AIParserError: Error, LocalizedError {
             return "The request took too long to complete. Please check your internet connection and try again."
         case .insufficientData:
             return "Unable to extract enough information from the recipe description. Please provide more details or enter ingredients manually."
+        case .rateLimited:
+            return "AI service quota exceeded. Please wait a moment and try again, or enter ingredients manually."
         }
     }
 }
@@ -53,32 +56,43 @@ struct ParsedIngredient: Hashable {
 /// Actor for thread-safe AI recipe parsing operations
 actor AIRecipeParser {
     private let session: URLSession
-    private let endpoint: URL
+    private let apiKey: String
     private let modelName: String
+    private let baseURL: URL?
     private let logger = Logger(subsystem: "com.halu.CountMe", category: "AIRecipeParser")
-    
+
     /// Initializes the AI recipe parser
     /// - Parameters:
-    ///   - endpoint: API endpoint URL (defaults to local Ollama server)
-    ///   - modelName: Ollama model name (defaults to gemma:4b)
-    ///   - session: URLSession for network requests (defaults to configured session with 120s timeout)
+    ///   - apiKey: Google Gemini API key (defaults to Secrets.googleGeminiAPIKey)
+    ///   - modelName: Gemini model name (defaults to gemini-2.0-flash)
+    ///   - baseURL: Optional override for the API base URL (useful for testing)
+    ///   - session: URLSession for network requests (defaults to configured session with 60s timeout)
     init(
-        endpoint: URL? = nil,
-        modelName: String = "gemma3:4b",
+        apiKey: String = Secrets.googleGeminiAPIKey,
+        modelName: String = "gemini-2.5-flash",
+        baseURL: URL? = nil,
         session: URLSession? = nil
     ) {
-        self.endpoint = endpoint ?? URL(string: "http://localhost:11434/api/generate")!
+        self.apiKey = apiKey
         self.modelName = modelName
+        self.baseURL = baseURL
         
-        // Configure session with 120-second timeout if not provided
         if let session = session {
             self.session = session
         } else {
             let configuration = URLSessionConfiguration.default
-            configuration.timeoutIntervalForRequest = 120.0
-            configuration.timeoutIntervalForResource = 120.0
+            configuration.timeoutIntervalForRequest = 60.0
+            configuration.timeoutIntervalForResource = 60.0
             self.session = URLSession(configuration: configuration)
         }
+    }
+    
+    /// Builds the full Gemini API endpoint URL
+    private func buildEndpointURL() -> URL {
+        if let baseURL = baseURL {
+            return baseURL
+        }
+        return URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(modelName):generateContent?key=\(apiKey)")!
     }
     
     /// Parses a recipe description into structured ingredients with nutritional data
@@ -86,13 +100,8 @@ actor AIRecipeParser {
     /// - Returns: ParsedRecipe with ingredients and confidence score
     /// - Throws: AIParserError if parsing fails
     func parseRecipe(description: String) async throws -> ParsedRecipe {
-        // Validate input
         try validateRecipeDescription(description)
-        
-        // Sanitize input to prevent prompt injection
         let sanitizedDescription = sanitizeInput(description)
-        
-        // Attempt parsing with retry logic
         return try await parseWithRetry(sanitizedDescription, maxAttempts: 3)
     }
     
@@ -100,7 +109,6 @@ actor AIRecipeParser {
     private func validateRecipeDescription(_ description: String) throws {
         let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Check length constraints
         guard trimmed.count >= 10 else {
             throw AIParserError.insufficientData
         }
@@ -109,7 +117,6 @@ actor AIRecipeParser {
             throw AIParserError.invalidResponse
         }
         
-        // Check for meaningful content (not just numbers or special characters)
         let alphanumericCount = trimmed.filter { $0.isLetter }.count
         guard alphanumericCount >= 5 else {
             throw AIParserError.insufficientData
@@ -118,15 +125,11 @@ actor AIRecipeParser {
     
     /// Sanitizes input to prevent prompt injection attacks
     private func sanitizeInput(_ input: String) -> String {
-        // Remove potential prompt injection patterns
         var sanitized = input
             .replacingOccurrences(of: "\\n\\n", with: " ")
             .replacingOccurrences(of: "```", with: "")
             .replacingOccurrences(of: "\"\"\"", with: "")
-        
-        // Trim whitespace
         sanitized = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
-        
         return sanitized
     }
     
@@ -140,109 +143,81 @@ actor AIRecipeParser {
             } catch let error as AIParserError {
                 lastError = error
                 
-                // Don't retry on validation errors or insufficient data
-                if case .insufficientData = error {
-                    throw error
-                }
+                if case .insufficientData = error { throw error }
+                if case .rateLimited = error { throw error }
+                if case .timeout = error, attempt > 0 { throw error }
                 
-                // Don't retry on timeout after first attempt
-                if case .timeout = error, attempt > 0 {
-                    throw error
-                }
-                
-                // Exponential backoff: 1s, 2s, 4s
                 if attempt < maxAttempts - 1 {
                     let delay = pow(2.0, Double(attempt))
                     try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
             } catch {
-                lastError = error
-                
-                // Don't retry on unexpected errors
                 throw AIParserError.networkError(error)
             }
         }
         
-        // If all retries failed, throw the last error
         throw lastError ?? AIParserError.parsingFailed
     }
-    
-    /// Performs the actual AI parsing request
+
+    /// Performs the actual Gemini API parsing request
     private func performParsing(_ description: String) async throws -> ParsedRecipe {
-        logger.info("=== STARTING AI RECIPE PARSING ===")
+        logger.info("=== STARTING AI RECIPE PARSING (Gemini) ===")
         logger.info("Recipe description: \(description)")
-        logger.info("Endpoint: \(self.endpoint.absoluteString)")
         logger.info("Model: \(self.modelName)")
         
-        // Build the request
+        let endpoint = buildEndpointURL()
+        
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Build the prompt
         let prompt = buildPrompt(for: description)
         
-        logger.debug("=== PROMPT ===")
-        logger.debug("\(prompt)")
-        logger.debug("=== END PROMPT ===")
-        
-        // Build request body for Ollama generate API
+        // Build Gemini API request body
         let requestBody: [String: Any] = [
-            "model": modelName,
-            "prompt": prompt,
-            "stream": false,
-            "options": [
+            "contents": [
+                [
+                    "parts": [
+                        ["text": prompt]
+                    ]
+                ]
+            ],
+            "generationConfig": [
                 "temperature": 0.3,
-                "num_predict": 1000
+                "maxOutputTokens": 8192,
+                "thinkingConfig": [
+                    "thinkingBudget": 1024
+                ]
             ]
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
-        if let requestData = request.httpBody,
-           let requestString = String(data: requestData, encoding: .utf8) {
-            logger.debug("=== REQUEST BODY ===")
-            logger.debug("\(requestString)")
-            logger.debug("=== END REQUEST BODY ===")
-        }
-        
-        // Make the request
         let data: Data
         let response: URLResponse
         
-        logger.info("🌐 Making request to Ollama...")
-        
         do {
             (data, response) = try await session.data(for: request)
-            logger.info("✅ Request completed successfully - Response size: \(data.count) bytes")
         } catch let error as NSError {
-            logger.error("❌ ERROR: Network request failed - \(error.localizedDescription) (Code: \(error.code), Domain: \(error.domain))")
-            
-            // Handle timeout errors specifically
             if error.code == NSURLErrorTimedOut {
                 throw AIParserError.timeout
             }
             throw AIParserError.networkError(error)
         }
         
-        // Check HTTP response
         guard let httpResponse = response as? HTTPURLResponse else {
-            logger.error("❌ ERROR: Response is not HTTPURLResponse")
             throw AIParserError.invalidResponse
         }
         
-        logger.info("📊 HTTP Status: \(httpResponse.statusCode)")
-        
         guard (200...299).contains(httpResponse.statusCode) else {
-            logger.error("❌ ERROR: HTTP status code indicates failure: \(httpResponse.statusCode)")
-            if let errorString = String(data: data, encoding: .utf8) {
-                logger.error("Error response body: \(errorString)")
+            logger.error("HTTP \(httpResponse.statusCode) from Gemini API")
+            if httpResponse.statusCode == 429 {
+                throw AIParserError.rateLimited
             }
             throw AIParserError.invalidResponse
         }
         
-        // Parse the response
-        return try parseAIResponse(data)
+        return try parseGeminiResponse(data)
     }
     
     /// Builds the structured prompt for AI parsing
@@ -318,49 +293,28 @@ actor AIRecipeParser {
         Return ONLY the JSON object, nothing else.
         """
     }
-    
-    /// Parses the AI service response into a ParsedRecipe
-    private func parseAIResponse(_ data: Data) throws -> ParsedRecipe {
-        // Log the raw response data
-        if let rawString = String(data: data, encoding: .utf8) {
-            logger.debug("=== RAW OLLAMA RESPONSE ===")
-            logger.debug("\(rawString)")
-            logger.debug("=== END RAW RESPONSE ===")
-        }
-        
-        // Parse Ollama response wrapper
+
+    /// Parses the Gemini API response into a ParsedRecipe
+    private func parseGeminiResponse(_ data: Data) throws -> ParsedRecipe {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            logger.error("❌ ERROR: Failed to parse response as JSON")
+            logger.error("Failed to parse Gemini response as JSON")
             throw AIParserError.invalidResponse
         }
         
-        // Log the parsed JSON structure
-        if let prettyData = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted),
-           let prettyString = String(data: prettyData, encoding: .utf8) {
-            logger.debug("=== PARSED OLLAMA JSON ===")
-            logger.debug("\(prettyString)")
-            logger.debug("=== END PARSED JSON ===")
-        }
-        
-        guard let content = json["response"] as? String else {
-            logger.error("❌ ERROR: No 'response' field in JSON. Available keys: \(json.keys.joined(separator: ", "))")
+        // Gemini response: candidates[0].content.parts[0].text
+        guard let candidates = json["candidates"] as? [[String: Any]],
+              let firstCandidate = candidates.first,
+              let content = firstCandidate["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]],
+              let firstPart = parts.first,
+              let text = firstPart["text"] as? String else {
+            logger.error("Unexpected Gemini response structure")
             throw AIParserError.invalidResponse
         }
         
-        logger.debug("=== EXTRACTED CONTENT ===")
-        logger.debug("\(content)")
-        logger.debug("=== END CONTENT ===")
+        let jsonString = extractJSON(from: text)
         
-        // Extract JSON from content (handle markdown blocks)
-        let jsonString = extractJSON(from: content)
-        
-        logger.debug("=== CLEANED JSON STRING ===")
-        logger.debug("\(jsonString)")
-        logger.debug("=== END CLEANED JSON ===")
-        
-        // Parse the recipe JSON
         guard let jsonData = jsonString.data(using: .utf8) else {
-            logger.error("❌ ERROR: Failed to convert cleaned JSON string to data")
             throw AIParserError.parsingFailed
         }
         
@@ -371,10 +325,6 @@ actor AIRecipeParser {
     private func extractJSON(from content: String) -> String {
         var cleaned = content.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        logger.debug("=== EXTRACTING JSON - STEP 1: Original ===")
-        logger.debug("\(cleaned)")
-        
-        // Remove markdown code blocks if present
         if cleaned.hasPrefix("```json") {
             cleaned = cleaned.replacingOccurrences(of: "```json", with: "")
             cleaned = cleaned.replacingOccurrences(of: "```", with: "")
@@ -384,63 +334,24 @@ actor AIRecipeParser {
         
         cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        logger.debug("=== EXTRACTING JSON - STEP 2: After markdown removal ===")
-        logger.debug("\(cleaned)")
-        
-        // Try to find JSON object boundaries - look for the outermost braces
         if let startIndex = cleaned.firstIndex(of: "{"),
            let endIndex = cleaned.lastIndex(of: "}") {
-            let range = startIndex...endIndex
-            cleaned = String(cleaned[range])
-            
-            logger.debug("=== EXTRACTING JSON - STEP 3: After brace extraction ===")
-            logger.debug("\(cleaned)")
+            cleaned = String(cleaned[startIndex...endIndex])
         }
-        
-        // Additional cleanup: remove any leading/trailing text
-        if let firstBrace = cleaned.firstIndex(of: "{") {
-            cleaned = String(cleaned[firstBrace...])
-        }
-        
-        if let lastBrace = cleaned.lastIndex(of: "}") {
-            cleaned = String(cleaned[...lastBrace])
-        }
-        
-        logger.debug("=== EXTRACTING JSON - FINAL ===")
-        logger.debug("\(cleaned)")
         
         return cleaned
     }
     
     /// Parses and validates the recipe JSON structure
     private func parseRecipeJSON(_ data: Data) throws -> ParsedRecipe {
-        let decoder = JSONDecoder()
-        
-        // Decode the response
         let response: RecipeParseResponse
         do {
-            response = try decoder.decode(RecipeParseResponse.self, from: data)
-            logger.info("✅ Successfully decoded RecipeParseResponse - Ingredients: \(response.ingredients.count), Confidence: \(response.confidence)")
+            response = try JSONDecoder().decode(RecipeParseResponse.self, from: data)
         } catch {
-            logger.error("❌ ERROR: Failed to decode RecipeParseResponse - \(error.localizedDescription)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, let context):
-                    logger.error("Missing key: \(key.stringValue) - \(context.debugDescription)")
-                case .typeMismatch(let type, let context):
-                    logger.error("Type mismatch: expected \(String(describing: type)) - \(context.debugDescription)")
-                case .valueNotFound(let type, let context):
-                    logger.error("Value not found: \(String(describing: type)) - \(context.debugDescription)")
-                case .dataCorrupted(let context):
-                    logger.error("Data corrupted: \(context.debugDescription)")
-                @unknown default:
-                    logger.error("Unknown decoding error")
-                }
-            }
+            logger.error("Failed to decode recipe JSON: \(error.localizedDescription)")
             throw AIParserError.parsingFailed
         }
         
-        // Validate response
         guard !response.ingredients.isEmpty else {
             throw AIParserError.insufficientData
         }
@@ -453,12 +364,10 @@ actor AIRecipeParser {
             throw AIParserError.parsingFailed
         }
         
-        // Validate each ingredient
         for ingredient in response.ingredients {
             try validateIngredient(ingredient)
         }
         
-        // Convert to ParsedIngredient objects
         let parsedIngredients = response.ingredients.map { ingredient in
             ParsedIngredient(
                 name: ingredient.name,
@@ -479,41 +388,29 @@ actor AIRecipeParser {
     
     /// Validates a single ingredient's data
     private func validateIngredient(_ ingredient: AIIngredient) throws {
-        // Validate name
         guard !ingredient.name.isEmpty else {
-            logger.error("❌ ERROR: Ingredient has empty name")
             throw AIParserError.insufficientData
         }
         
-        // Validate unit is not empty
         guard !ingredient.unit.isEmpty else {
-            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has empty unit")
             throw AIParserError.invalidResponse
         }
         
-        // Validate quantity
         guard ingredient.quantity > 0 else {
-            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has invalid quantity: \(ingredient.quantity)")
             throw AIParserError.invalidResponse
         }
         
-        // Validate calories (allow 0 for items like spices/extracts)
         guard ingredient.calories >= 0 else {
-            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative calories: \(ingredient.calories)")
             throw AIParserError.invalidResponse
         }
         
-        // Validate optional macros are non-negative if present
         if let protein = ingredient.protein, protein < 0 {
-            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative protein: \(protein)")
             throw AIParserError.invalidResponse
         }
         if let carbs = ingredient.carbohydrates, carbs < 0 {
-            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative carbs: \(carbs)")
             throw AIParserError.invalidResponse
         }
         if let fats = ingredient.fats, fats < 0 {
-            logger.error("❌ ERROR: Ingredient '\(ingredient.name)' has negative fats: \(fats)")
             throw AIParserError.invalidResponse
         }
     }

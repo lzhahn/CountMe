@@ -10,4 +10,5 @@ import Foundation
 enum Secrets {
     static let fatSecretConsumerKey = "YOUR_CONSUMER_KEY_HERE"
     static let fatSecretConsumerSecret = "YOUR_CONSUMER_SECRET_HERE"
+    static let googleGeminiAPIKey = "AIzaSyBOYMq08chtwM2mB9MhNqvY5GL9Gq1Zjtg"
 }

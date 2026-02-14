@@ -126,7 +126,7 @@ struct CustomMealDetailViewTests {
     
     // MARK: - Adding to Daily Log Tests
     
-    @Test("Adding meal to daily log creates correct number of food items")
+    @Test("Adding meal to daily log creates a single food item for the meal")
     func testAddingMealCreatesCorrectNumberOfFoodItems() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
@@ -148,9 +148,10 @@ struct CustomMealDetailViewTests {
         
         let foodItems = try await addMeal()
         
-        // Should create one food item per ingredient
-        #expect(foodItems.count == meal.ingredients.count)
-        #expect(foodItems.count == 2)
+        // Should create a single food item for the whole meal
+        #expect(foodItems.count == 1)
+        #expect(foodItems[0].name == "Test Meal")
+        #expect(foodItems[0].calories == 400.0) // 200 + 200
     }
     
     @Test("Adding meal with multiplier adjusts food item calories")
@@ -176,12 +177,11 @@ struct CustomMealDetailViewTests {
         
         let foodItems = try await addMeal()
         
-        // Check first food item calories
-        let firstFoodItem = foodItems[0]
-        let expectedCalories = meal.ingredients[0].calories * multiplier
-        
-        #expect(firstFoodItem.calories == expectedCalories)
-        #expect(firstFoodItem.calories == 400.0) // 200 * 2
+        // Single food item with total meal calories scaled by multiplier
+        #expect(foodItems.count == 1)
+        let expectedCalories = meal.totalCalories * multiplier
+        #expect(foodItems[0].calories == expectedCalories)
+        #expect(foodItems[0].calories == 800.0) // (200 + 200) * 2
     }
     
     @Test("Adding meal sets food item source to customMeal")

@@ -1,29 +1,16 @@
-# AIRecipeParser - Ollama Setup
+# AIRecipeParser - Google Gemini Setup
 
-The AIRecipeParser uses Ollama for local AI-powered recipe parsing. This provides privacy and offline capability without requiring external API keys.
+The AIRecipeParser uses Google's Gemini API for AI-powered recipe parsing. It extracts structured ingredient and nutritional data from natural language recipe descriptions.
 
 ## Prerequisites
 
-1. **Install Ollama**: Download from [ollama.ai](https://ollama.ai)
-   ```bash
-   # macOS
-   brew install ollama
+1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Add your key to `CountMe/Utilities/Secrets.swift`:
+   ```swift
+   static let googleGeminiAPIKey = "YOUR_KEY_HERE"
    ```
-
-2. **Pull the model**: The default model is `llama3.2`
-   ```bash
-   ollama pull llama3.2
-   ```
-
-3. **Start Ollama server**: 
-   ```bash
-   ollama serve
-   ```
-   The server runs on `http://localhost:11434` by default. The parser uses the `/api/generate` endpoint.
 
 ## Usage
-
-The AIRecipeParser is configured to use Ollama by default:
 
 ```swift
 let parser = AIRecipeParser()
@@ -32,35 +19,23 @@ let result = try await parser.parseRecipe(description: "chicken stir fry with ri
 
 ## Configuration
 
-You can customize the endpoint and model:
+You can customize the model:
 
 ```swift
 let parser = AIRecipeParser(
-    endpoint: URL(string: "http://localhost:11434/api/generate")!,
-    modelName: "llama3.2"
+    apiKey: "your-api-key",
+    modelName: "gemini-2.0-flash"
 )
 ```
 
-## Recommended Models
+## Supported Models
 
-- **llama3.2** (default): Good balance of speed and accuracy
-- **llama3.1**: More accurate but slower
-- **mistral**: Faster but less accurate for nutrition data
-
-## Testing
-
-The implementation includes comprehensive tests that use mock responses. To test with a real Ollama instance:
-
-1. Ensure Ollama is running
-2. Run the app and try the recipe parsing feature
-3. Check the console for any errors
+- `gemini-2.0-flash` (default): Fast and accurate
+- `gemini-2.5-flash`: Latest, best quality/speed tradeoff
+- `gemini-2.5-pro`: Most capable, slower
 
 ## Troubleshooting
 
-**Connection refused**: Make sure Ollama is running (`ollama serve`)
-
-**Model not found**: Pull the model first (`ollama pull llama3.2`)
-
-**Slow responses**: Consider using a smaller model or increasing the timeout
-
-**Inaccurate parsing**: Try a larger model like `llama3.1` or adjust the prompt
+- **401 Unauthorized**: Check your API key in Secrets.swift
+- **429 Rate Limited**: You've exceeded the free tier quota. Wait or upgrade your plan
+- **Inaccurate parsing**: Try `gemini-2.5-pro` for better nutrition estimates

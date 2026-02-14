@@ -383,25 +383,26 @@ final class CustomMealManager {
         }
         
         do {
-            var createdFoodItems: [FoodItem] = []
+            // Create a single FoodItem representing the whole meal at the requested serving
+            let perServingFactor = servingMultiplier / meal.servingsCount
             
-            // Convert each ingredient to a FoodItem with adjusted serving size
-            for ingredient in meal.ingredients {
-                let foodItem = FoodItem(
-                    name: ingredient.name,
-                    calories: ingredient.calories * servingMultiplier,
-                    timestamp: Date(),
-                    servingSize: "\(ingredient.quantity * servingMultiplier)",
-                    servingUnit: ingredient.unit,
-                    source: .customMeal,
-                    protein: ingredient.protein.map { $0 * servingMultiplier },
-                    carbohydrates: ingredient.carbohydrates.map { $0 * servingMultiplier },
-                    fats: ingredient.fats.map { $0 * servingMultiplier }
-                )
-                
-                log.foodItems.append(foodItem)
-                createdFoodItems.append(foodItem)
-            }
+            let servingLabel = servingMultiplier == 1.0
+                ? "1 serving"
+                : "\(String(format: "%g", servingMultiplier)) servings"
+            
+            let foodItem = FoodItem(
+                name: meal.name,
+                calories: meal.totalCalories * perServingFactor,
+                timestamp: Date(),
+                servingSize: servingLabel,
+                servingUnit: "serving",
+                source: .customMeal,
+                protein: meal.totalProtein * perServingFactor,
+                carbohydrates: meal.totalCarbohydrates * perServingFactor,
+                fats: meal.totalFats * perServingFactor
+            )
+            
+            log.foodItems.append(foodItem)
             
             // Update the meal's lastUsedAt timestamp
             meal.lastUsedAt = Date()
@@ -410,7 +411,7 @@ final class CustomMealManager {
             // Reload meals to reflect updated lastUsedAt
             await loadAllCustomMeals()
             
-            return createdFoodItems
+            return [foodItem]
         } catch {
             errorMessage = "Unable to add custom meal to log. Please try again."
             throw error

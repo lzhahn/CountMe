@@ -12,3 +12,4 @@ CountMe/Config.local.xcconfig
 
 # macOS
 .DS_Store
+CountMe/Utilities/Secrets.swift
