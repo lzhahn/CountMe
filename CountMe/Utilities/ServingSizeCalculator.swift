@@ -58,7 +58,7 @@ enum ServingSizeCalculator {
         }
         
         // Create new ingredient with scaled values, preserving immutability
-        return Ingredient(
+        return try Ingredient(
             id: ingredient.id,
             name: ingredient.name,
             quantity: ingredient.quantity * multiplier,

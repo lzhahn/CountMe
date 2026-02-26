@@ -45,7 +45,7 @@ enum NutritionalDataValidator {
         }
         
         guard value >= 0 else {
-            throw ValidationError.negativeValue(fieldName: fieldName, value: value)
+            throw NutritionalValidationError.negativeValue(fieldName: fieldName, value: value)
         }
     }
     
@@ -73,7 +73,7 @@ enum NutritionalDataValidator {
     /// **Validates: Requirements 10.3**
     static func validateServingSize(_ value: Double, fieldName: String) throws {
         guard value > 0 else {
-            throw ValidationError.nonPositiveValue(fieldName: fieldName, value: value)
+            throw NutritionalValidationError.nonPositiveValue(fieldName: fieldName, value: value)
         }
     }
     
@@ -104,7 +104,7 @@ enum NutritionalDataValidator {
     static func validateRequiredIngredientFields(name: String, calories: Double) throws {
         // Validate name is non-empty
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw ValidationError.missingRequiredField(fieldName: "Name")
+            throw NutritionalValidationError.missingRequiredField(fieldName: "Name")
         }
         
         // Validate calories are non-negative
@@ -158,7 +158,7 @@ enum NutritionalDataValidator {
 }
 
 /// Errors that can occur during nutritional data validation
-enum ValidationError: Error, LocalizedError {
+enum NutritionalValidationError: Error, LocalizedError {
     /// A nutritional value is negative
     case negativeValue(fieldName: String, value: Double)
     

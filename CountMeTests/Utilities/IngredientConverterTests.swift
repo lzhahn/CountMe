@@ -230,7 +230,7 @@ struct IngredientConverterTests {
     @Test("Convert food item with all fields to ingredient")
     func convertFoodItemWithAllFields() throws {
         // Given: A food item with complete nutritional data
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Brown Rice",
             calories: 216,
             servingSize: "1",
@@ -256,7 +256,7 @@ struct IngredientConverterTests {
     @Test("Convert food item with missing macro data")
     func convertFoodItemWithMissingMacros() throws {
         // Given: A food item without macro data (backward compatibility)
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Pasta",
             calories: 200,
             servingSize: "2",
@@ -282,7 +282,7 @@ struct IngredientConverterTests {
     @Test("Convert food item with missing serving size defaults to 1.0")
     func convertFoodItemWithMissingServingSize() throws {
         // Given: A food item without serving size
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Salad",
             calories: 150,
             servingSize: nil,
@@ -304,7 +304,7 @@ struct IngredientConverterTests {
     @Test("Convert food item with invalid serving size defaults to 1.0")
     func convertFoodItemWithInvalidServingSize() throws {
         // Given: A food item with non-numeric serving size
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Soup",
             calories: 120,
             servingSize: "one bowl",
@@ -322,6 +322,9 @@ struct IngredientConverterTests {
         #expect(ingredient.unit == "bowl")
     }
     
+    // NOTE: This test is no longer valid - FoodItem now validates empty names at construction
+    // The validation is tested in FoodItem model tests
+    /*
     @Test("Convert food item rejects empty name")
     func convertFoodItemRejectsEmptyName() throws {
         // Given: A food item with empty name
@@ -337,7 +340,11 @@ struct IngredientConverterTests {
             try IngredientConverter.convertFoodItemToIngredient(foodItem)
         }
     }
+    */
     
+    // NOTE: These tests are no longer valid - FoodItem now validates at construction
+    // The validation is tested in FoodItem model tests
+    /*
     @Test("Convert food item rejects negative calories")
     func convertFoodItemRejectsNegativeCalories() throws {
         // Given: A food item with negative calories
@@ -410,11 +417,12 @@ struct IngredientConverterTests {
             try IngredientConverter.convertFoodItemToIngredient(foodItem)
         }
     }
+    */
     
     @Test("Convert food item with zero serving size defaults to 1.0")
     func convertFoodItemWithZeroServingSize() throws {
         // Given: A food item with zero serving size
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Snack",
             calories: 80,
             servingSize: "0",

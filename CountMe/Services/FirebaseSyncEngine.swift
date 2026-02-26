@@ -39,6 +39,9 @@ actor FirebaseSyncEngine {
     /// Queue of pending sync operations to execute when online
     private var syncQueue: [SyncOperation] = []
     
+    /// Maximum number of operations allowed in the sync queue
+    private let maxQueueSize = 1000
+    
     /// Flag indicating if sync is currently in progress
     private var isSyncing = false
     
@@ -289,14 +292,26 @@ actor FirebaseSyncEngine {
     /// Operations are deduplicated - if an operation for the same entity already exists,
     /// the newer operation replaces the older one to avoid redundant syncs.
     ///
+    /// The queue enforces a maximum size of 1,000 operations. When at capacity,
+    /// the oldest operation is dropped to make room for the new one.
+    ///
     /// - Parameter operation: The sync operation to queue
     ///
-    /// **Validates: Requirements 7.2, 13.4 (Offline Changes Queued)**
+    /// **Validates: Requirements 7.1, 7.2, 7.3 (Sync Queue Size Limit), 7.2, 13.4 (Offline Changes Queued)**
     func queueOperation(_ operation: SyncOperation) {
         // Remove any existing operations for the same entity to avoid duplicates
         syncQueue.removeAll { existing in
             existing.entityId == operation.entityId &&
             existing.entityType == operation.entityType
+        }
+        
+        // Enforce maximum queue size - drop oldest if at capacity
+        if syncQueue.count >= maxQueueSize {
+            // Sort by timestamp to find oldest
+            syncQueue.sort { $0.timestamp < $1.timestamp }
+            // Remove the oldest operation
+            let removed = syncQueue.removeFirst()
+            print("⚠️ Queue at capacity (\(maxQueueSize)) - dropped oldest operation: \(removed.entityType) \(removed.entityId)")
         }
         
         // Add the new operation
@@ -309,8 +324,10 @@ actor FirebaseSyncEngine {
     /// Processes all queued sync operations
     ///
     /// Executes all pending operations in chronological order (oldest first).
-    /// If any operation fails, it remains in the queue for retry. Successfully
-    /// completed operations are removed from the queue.
+    /// Each operation is wrapped in RetryManager.executeWithRetry() for automatic
+    /// retry with exponential backoff. Operations are removed from the queue on
+    /// success or when max retries are exceeded. Processing continues for all
+    /// operations regardless of individual failures.
     ///
     /// This method is called automatically when:
     /// - Network connectivity is restored
@@ -319,7 +336,7 @@ actor FirebaseSyncEngine {
     ///
     /// - Throws: SyncError if queue processing encounters errors
     ///
-    /// **Validates: Requirements 7.3, 7.4 (Automatic Sync On Reconnect), 13.2, 13.3 (Error Handling)**
+    /// **Validates: Requirements 7.3, 7.4 (Automatic Sync On Reconnect), 8.1, 8.2, 8.3, 8.4 (Per-Item Retry with Backoff), 13.2, 13.3 (Error Handling)**
     func processQueue() async throws {
         // Prevent concurrent queue processing
         guard !isSyncing else {
@@ -340,51 +357,58 @@ actor FirebaseSyncEngine {
         let sortedOperations = syncQueue.sorted { $0.timestamp < $1.timestamp }
         
         var successCount = 0
-        var failedOperations: [SyncOperation] = []
-        var errors: [Error] = []
+        var failedCount = 0
         
         for operation in sortedOperations {
+            // Create unique operation ID for retry tracking
+            let operationId = "queue_\(operation.entityId)_\(operation.entityType.rawValue)"
+            
             do {
-                // Process each operation based on its type
-                switch operation {
-                case .create(let entityId, let entityType, _),
-                     .update(let entityId, let entityType, _):
-                    // Fetch entity from local store and upload
-                    try await processUploadOperation(entityId: entityId, entityType: entityType)
-                    
-                case .delete(let entityId, let entityType, _):
-                    // Delete from cloud
-                    try await processDeleteOperation(entityId: entityId, entityType: entityType)
+                // Wrap operation in RetryManager for exponential backoff retry
+                try await retryManager.executeWithRetry(operationId: operationId) {
+                    // Process each operation based on its type
+                    switch operation {
+                    case .create(let entityId, let entityType, _),
+                         .update(let entityId, let entityType, _):
+                        // Fetch entity from local store and upload
+                        try await self.processUploadOperation(entityId: entityId, entityType: entityType)
+                        
+                    case .delete(let entityId, let entityType, _):
+                        // Delete from cloud
+                        try await self.processDeleteOperation(entityId: entityId, entityType: entityType)
+                    }
                 }
                 
-                // Remove successfully processed operation from queue
+                // Success - remove operation from queue
                 syncQueue.removeAll { $0.entityId == operation.entityId && $0.entityType == operation.entityType }
                 successCount += 1
                 
                 print("✓ Processed operation for \(operation.entityType) \(operation.entityId)")
                 
             } catch {
-                // Keep failed operations in queue for retry
-                failedOperations.append(operation)
-                errors.append(error)
+                // Operation failed after retries or non-retryable error - remove from queue and log
+                syncQueue.removeAll { $0.entityId == operation.entityId && $0.entityType == operation.entityType }
+                failedCount += 1
                 
                 logError(
                     error as? SyncError ?? SyncError.firestoreError(error),
-                    context: "processQueue",
+                    context: "processQueue (after retries)",
                     entityId: operation.entityId
                 )
+                
+                print("✗ Failed operation for \(operation.entityType) \(operation.entityId) after retries: \(error.localizedDescription)")
+                
+                // Continue processing remaining operations (Requirement 8.4)
             }
         }
         
         // Update persisted queue with remaining operations
         persistQueue()
         
-        print("Queue processing complete: \(successCount) succeeded, \(failedOperations.count) failed")
+        print("Queue processing complete: \(successCount) succeeded, \(failedCount) failed after retries")
         
-        // If any operations failed, throw error to notify caller
-        if !failedOperations.isEmpty {
-            throw SyncError.queueProcessingFailed(count: failedOperations.count)
-        }
+        // Note: We don't throw an error here because we want to report success for partial completion
+        // Individual operation failures are logged above
     }
     
     /// Processes an upload operation from the queue
@@ -578,8 +602,16 @@ actor FirebaseSyncEngine {
         let entityType = determineEntityType(entity)
         let collectionPath = getCollectionPath(for: entityType, userId: userId)
         
+        print("🔍 DEBUG uploadToFirestore:")
+        print("  - Entity type: \(entityType)")
+        print("  - Entity ID: \(entity.id)")
+        print("  - Entity userId: \(entity.userId)")
+        print("  - Authenticated userId: \(userId)")
+        print("  - Collection path: \(collectionPath)")
+        
         // Convert entity to Firestore data
         let data = entity.toFirestoreData()
+        print("  - Firestore data userId: \(data["userId"] ?? "missing")")
         
         // Create operation ID for retry tracking
         let operationId = "upload_\(entity.id)"
@@ -788,16 +820,18 @@ actor FirebaseSyncEngine {
         
         // Download all entity types in parallel
         async let foodItems = downloadFoodItems(userId: userId)
+        async let exerciseItems = downloadExerciseItems(userId: userId)
         async let dailyLogs = downloadDailyLogs(userId: userId)
         async let customMeals = downloadCustomMeals(userId: userId)
         
         do {
             // Wait for all downloads to complete
-            let (downloadedFoodItems, downloadedDailyLogs, downloadedCustomMeals) = try await (foodItems, dailyLogs, customMeals)
+            let (downloadedFoodItems, downloadedExerciseItems, downloadedDailyLogs, downloadedCustomMeals) = try await (foodItems, exerciseItems, dailyLogs, customMeals)
             
             // Update local store with downloaded data
             try await updateLocalStore(
                 foodItems: downloadedFoodItems,
+                exerciseItems: downloadedExerciseItems,
                 dailyLogs: downloadedDailyLogs,
                 customMeals: downloadedCustomMeals
             )
@@ -845,6 +879,46 @@ actor FirebaseSyncEngine {
         }
         
         return foodItems
+    }
+    
+    /// Downloads all ExerciseItem entities for a user from Firestore
+    ///
+    /// Fetches all documents from the user's exerciseItems collection and converts
+    /// them to ExerciseItem instances using the fromFirestoreData method.
+    /// Filters results to only include items with matching userId (Requirement 10.4).
+    ///
+    /// - Parameter userId: The authenticated user's unique identifier
+    /// - Returns: Array of ExerciseItem instances
+    /// - Throws: SyncError if download or parsing fails
+    ///
+    /// **Validates: Requirements 6.1, 10.4 (Query Filters By User ID)**
+    private func downloadExerciseItems(userId: String) async throws -> [ExerciseItem] {
+        let collectionPath = getCollectionPath(for: .exerciseItem, userId: userId)
+        
+        // Query with userId filter (Requirement 10.4)
+        let snapshot = try await db.collection(collectionPath)
+            .whereField("userId", isEqualTo: userId)
+            .getDocuments()
+        
+        var exerciseItems: [ExerciseItem] = []
+        for document in snapshot.documents {
+            do {
+                let exerciseItem = try ExerciseItem.fromFirestoreData(document.data())
+                
+                // Additional validation: verify userId matches (defense in depth)
+                guard exerciseItem.userId == userId else {
+                    print("⚠️ Skipping ExerciseItem \(document.documentID) with mismatched userId")
+                    continue
+                }
+                
+                exerciseItems.append(exerciseItem)
+            } catch {
+                // Log parsing error but continue with other documents
+                print("Failed to parse ExerciseItem document \(document.documentID): \(error)")
+            }
+        }
+        
+        return exerciseItems
     }
     
     /// Downloads all DailyLog entities for a user from Firestore
@@ -940,11 +1014,13 @@ actor FirebaseSyncEngine {
     ///
     /// - Parameters:
     ///   - foodItems: Downloaded food items
+    ///   - exerciseItems: Downloaded exercise items
     ///   - dailyLogs: Downloaded daily logs
     ///   - customMeals: Downloaded custom meals
     /// - Throws: SyncError.dataStoreError if local update fails
     private func updateLocalStore(
         foodItems: [FoodItem],
+        exerciseItems: [ExerciseItem],
         dailyLogs: [DailyLog],
         customMeals: [CustomMeal]
     ) async throws {
@@ -1015,7 +1091,7 @@ actor FirebaseSyncEngine {
         
         // Special handling for daily logs - merge food items
         if let localLog = local as? DailyLog, let cloudLog = cloud as? DailyLog {
-            return mergeDailyLogs(local: localLog, cloud: cloudLog)
+            return try mergeDailyLogs(local: localLog, cloud: cloudLog)
         }
         
         // Standard last-write-wins for other entity types
@@ -1086,7 +1162,7 @@ actor FirebaseSyncEngine {
     /// - Returns: A merged DailyLog containing food items from both versions
     ///
     /// **Validates: Requirements 8.4 (Daily Log Merging)**
-    func mergeDailyLogs(local: DailyLog, cloud: DailyLog) -> DailyLog {
+    func mergeDailyLogs(local: DailyLog, cloud: DailyLog) throws -> DailyLog {
         print("Merging DailyLog \(local.id): combining food items from both versions")
         
         // Start with local food items
@@ -1136,7 +1212,7 @@ actor FirebaseSyncEngine {
         }
         
         // Create the merged daily log
-        let merged = DailyLog(
+        let merged = try DailyLog(
             id: UUID(uuidString: local.id) ?? UUID(),
             date: local.date,
             foodItems: mergedFoodItems,
@@ -1188,12 +1264,21 @@ actor FirebaseSyncEngine {
         print("Starting real-time listeners for user: \(userId)")
         
         // Set up listeners for all entity types
+        // Food/exercise items first so they're available when daily logs arrive
         setupRealtimeListener(collection: "foodItems", userId: userId, entityType: .foodItem)
         setupRealtimeListener(collection: "exerciseItems", userId: userId, entityType: .exerciseItem)
         setupRealtimeListener(collection: "dailyLogs", userId: userId, entityType: .dailyLog)
         setupRealtimeListener(collection: "customMeals", userId: userId, entityType: .customMeal)
         
         print("Real-time listeners started successfully")
+        
+        // Deferred re-association: after initial snapshots settle, re-link any
+        // daily logs whose food/exercise items arrived out of order
+        Task {
+            // Allow time for initial snapshot events to process
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await repairDailyLogAssociations(userId: userId)
+        }
     }
     
     /// Stops all active real-time listeners
@@ -1345,7 +1430,10 @@ actor FirebaseSyncEngine {
                     return
                 }
                 
-                try await handleDailyLogUpdate(cloudLog)
+                // Extract relationship IDs from raw Firestore data for re-association
+                let foodItemIds = data["foodItemIds"] as? [String] ?? []
+                let exerciseItemIds = data["exerciseItemIds"] as? [String] ?? []
+                try await handleDailyLogUpdate(cloudLog, foodItemIds: foodItemIds, exerciseItemIds: exerciseItemIds)
                 
             case .customMeal:
                 let cloudMeal = try CustomMeal.fromFirestoreData(data)
@@ -1439,26 +1527,230 @@ actor FirebaseSyncEngine {
     /// - Throws: SyncError if conflict resolution or local update fails
     ///
     /// **Validates: Requirements 8.1, 8.4 (Conflict Detection and Daily Log Merging)**
-    private func handleDailyLogUpdate(_ cloudLog: DailyLog) async throws {
-        // Fetch local version if it exists
-        let localLog = try await dataStore.fetchDailyLog(byId: cloudLog.id)
+    private func handleDailyLogUpdate(_ cloudLog: DailyLog, foodItemIds: [String] = [], exerciseItemIds: [String] = []) async throws {
+        // First, try to find local version by ID
+        let localLogById = try await dataStore.fetchDailyLog(byId: cloudLog.id)
         
-        if let localLog = localLog {
+        if let localLog = localLogById {
             // Conflict detection: compare lastModified timestamps
             if localLog.lastModified != cloudLog.lastModified {
                 // Timestamps differ - merge the daily logs
                 print("Conflict detected for DailyLog \(cloudLog.id): merging food items")
-                let mergedLog = mergeDailyLogs(local: localLog, cloud: cloudLog)
-                try await dataStore.updateDailyLog(mergedLog)
+                let mergedLog = try mergeDailyLogs(local: localLog, cloud: cloudLog)
+                // Copy merged properties back to the managed local log
+                applyMergedProperties(from: mergedLog, to: localLog)
+                try await dataStore.updateDailyLog(localLog)
+                try await associateItemsWithDailyLog(localLog, foodItemIds: foodItemIds, exerciseItemIds: exerciseItemIds)
             } else {
-                // Same timestamp - update anyway to ensure consistency
+                // Same timestamp - update the managed local log with cloud data
                 print("DailyLog \(cloudLog.id) has same timestamp, updating local")
-                try await dataStore.updateDailyLog(cloudLog)
+                localLog.dailyGoal = cloudLog.dailyGoal
+                localLog.lastModified = cloudLog.lastModified
+                localLog.syncStatus = cloudLog.syncStatus
+                try await dataStore.updateDailyLog(localLog)
+                try await associateItemsWithDailyLog(localLog, foodItemIds: foodItemIds, exerciseItemIds: exerciseItemIds)
             }
         } else {
-            // No local version - insert cloud version
-            print("New DailyLog \(cloudLog.id) from cloud, inserting locally")
-            try await dataStore.insertDailyLog(cloudLog)
+            // No ID match — check if a local log already exists for the same date
+            // This prevents duplicate DailyLogs when a new device creates an empty log
+            // before the cloud log arrives via snapshot listener
+            let localLogByDate = try await dataStore.fetchDailyLog(for: cloudLog.date)
+            
+            if let existingLog = localLogByDate {
+                // Merge cloud data into the existing date-matched log
+                print("Found existing DailyLog for date \(cloudLog.date), merging cloud data into it")
+                let mergedLog = try mergeDailyLogs(local: existingLog, cloud: cloudLog)
+                // Copy merged properties back to the managed existing log
+                applyMergedProperties(from: mergedLog, to: existingLog)
+                try await dataStore.updateDailyLog(existingLog)
+                try await associateItemsWithDailyLog(existingLog, foodItemIds: foodItemIds, exerciseItemIds: exerciseItemIds)
+            } else {
+                // No local version at all - insert cloud version (becomes managed after insert)
+                print("New DailyLog \(cloudLog.id) from cloud, inserting locally")
+                try await dataStore.insertDailyLog(cloudLog)
+                try await associateItemsWithDailyLog(cloudLog, foodItemIds: foodItemIds, exerciseItemIds: exerciseItemIds)
+            }
+        }
+    }
+    
+    /// Copies merged properties from an unmanaged merged log to a SwiftData-managed log
+    ///
+    /// `mergeDailyLogs` creates a new DailyLog instance that is NOT managed by SwiftData.
+    /// This helper copies the relevant properties back to the existing managed log so that
+    /// `modelContext.save()` actually persists the changes.
+    ///
+    /// - Parameters:
+    ///   - source: The unmanaged merged DailyLog with combined data
+    ///   - target: The SwiftData-managed DailyLog to update
+    private func applyMergedProperties(from source: DailyLog, to target: DailyLog) {
+        // Copy food items — add any from source that aren't already in target
+        for item in source.foodItems {
+            if !target.foodItems.contains(where: { $0.id == item.id }) {
+                target.foodItems.append(item)
+            }
+        }
+        
+        // Copy exercise items — add any from source that aren't already in target
+        for item in source.exerciseItems {
+            if !target.exerciseItems.contains(where: { $0.id == item.id }) {
+                target.exerciseItems.append(item)
+            }
+        }
+        
+        target.dailyGoal = source.dailyGoal
+        target.lastModified = source.lastModified
+        target.syncStatus = source.syncStatus
+    }
+    
+    /// Associates food items and exercise items with a daily log by fetching them from the local store
+    ///
+    /// When a DailyLog is downloaded from Firestore, it arrives with empty relationship arrays
+    /// because `fromFirestoreData` cannot resolve SwiftData relationships. This method uses the
+    /// `foodItemIds` and `exerciseItemIds` stored in the Firestore document to look up the
+    /// corresponding local entities and attach them to the log's relationships.
+    ///
+    /// - Parameters:
+    ///   - dailyLog: The daily log to associate items with
+    ///   - foodItemIds: Array of food item ID strings from Firestore data
+    ///   - exerciseItemIds: Array of exercise item ID strings from Firestore data
+    ///
+    /// **Validates: Requirements 6.2 (Real-Time Cloud Updates)**
+    private func associateItemsWithDailyLog(_ dailyLog: DailyLog, foodItemIds: [String], exerciseItemIds: [String]) async throws {
+        guard !foodItemIds.isEmpty || !exerciseItemIds.isEmpty else { return }
+        
+        let userId = dailyLog.userId
+        
+        // Fetch and associate food items
+        for foodItemId in foodItemIds {
+            if let foodItem = try await dataStore.fetchFoodItem(byId: foodItemId) {
+                if !dailyLog.foodItems.contains(where: { $0.id == foodItemId }) {
+                    dailyLog.foodItems.append(foodItem)
+                }
+            } else {
+                // Item not found locally — try downloading from Firestore
+                if !userId.isEmpty {
+                    do {
+                        let collectionPath = getCollectionPath(for: .foodItem, userId: userId)
+                        let doc = try await db.collection(collectionPath).document(foodItemId).getDocument()
+                        if let data = doc.data() {
+                            let cloudItem = try FoodItem.fromFirestoreData(data)
+                            try await dataStore.insertFoodItem(cloudItem)
+                            if !dailyLog.foodItems.contains(where: { $0.id == foodItemId }) {
+                                dailyLog.foodItems.append(cloudItem)
+                            }
+                            print("📥 Downloaded missing FoodItem \(foodItemId) from cloud")
+                        } else {
+                            print("⚠️ FoodItem \(foodItemId) not found in cloud either")
+                        }
+                    } catch {
+                        print("⚠️ Failed to download FoodItem \(foodItemId): \(error)")
+                    }
+                }
+            }
+        }
+        
+        // Fetch and associate exercise items
+        for exerciseItemId in exerciseItemIds {
+            if let exerciseItem = try await dataStore.fetchExerciseItem(byId: exerciseItemId) {
+                if !dailyLog.exerciseItems.contains(where: { $0.id == exerciseItemId }) {
+                    dailyLog.exerciseItems.append(exerciseItem)
+                }
+            } else {
+                // Item not found locally — try downloading from Firestore
+                if !userId.isEmpty {
+                    do {
+                        let collectionPath = getCollectionPath(for: .exerciseItem, userId: userId)
+                        let doc = try await db.collection(collectionPath).document(exerciseItemId).getDocument()
+                        if let data = doc.data() {
+                            let cloudItem = try ExerciseItem.fromFirestoreData(data)
+                            try await dataStore.insertExerciseItem(cloudItem)
+                            if !dailyLog.exerciseItems.contains(where: { $0.id == exerciseItemId }) {
+                                dailyLog.exerciseItems.append(cloudItem)
+                            }
+                            print("📥 Downloaded missing ExerciseItem \(exerciseItemId) from cloud")
+                        } else {
+                            print("⚠️ ExerciseItem \(exerciseItemId) not found in cloud either")
+                        }
+                    } catch {
+                        print("⚠️ Failed to download ExerciseItem \(exerciseItemId): \(error)")
+                    }
+                }
+            }
+        }
+        
+        // Save the updated relationships
+        try await dataStore.updateDailyLog(dailyLog)
+    }
+    
+    /// Repairs daily log associations after initial sync
+    ///
+    /// When snapshot listeners fire on first login, DailyLogs may arrive before their
+    /// associated FoodItems/ExerciseItems. This method runs after a delay to re-fetch
+    /// the Firestore documents for any daily logs with empty relationships and
+    /// re-associate the items that are now available locally.
+    ///
+    /// - Parameter userId: The authenticated user's unique identifier
+    ///
+    /// **Validates: Requirements 6.2 (Real-Time Cloud Updates)**
+    private func repairDailyLogAssociations(userId: String) async {
+        do {
+            let allLogs = try await dataStore.fetchAllDailyLogs()
+            let emptyLogs = allLogs.filter { $0.userId == userId && $0.foodItems.isEmpty && $0.exerciseItems.isEmpty }
+            
+            guard !emptyLogs.isEmpty else { return }
+            
+            print("🔧 Repairing \(emptyLogs.count) daily log(s) with missing associations")
+            
+            // Fetch ALL daily log documents from Firestore for this user
+            let collectionPath = getCollectionPath(for: .dailyLog, userId: userId)
+            let snapshot = try await db.collection(collectionPath)
+                .whereField("userId", isEqualTo: userId)
+                .getDocuments()
+            
+            // Build a lookup of cloud docs by date STRING (yyyy-MM-dd) for robust matching
+            // Using Date equality can fail due to timezone/subsecond differences
+            let calendar = Calendar.current
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = calendar.timeZone
+            
+            var cloudDocsByDateString: [String: [String: Any]] = [:]
+            for document in snapshot.documents {
+                let data = document.data()
+                if let timestamp = data["date"] as? Timestamp {
+                    let normalizedDate = calendar.startOfDay(for: timestamp.dateValue())
+                    let dateKey = dateFormatter.string(from: normalizedDate)
+                    cloudDocsByDateString[dateKey] = data
+                }
+            }
+            
+            print("🔧 Found \(cloudDocsByDateString.count) cloud daily log(s) for matching")
+            
+            for log in emptyLogs {
+                let logDate = calendar.startOfDay(for: log.date)
+                let logDateKey = dateFormatter.string(from: logDate)
+                
+                guard let data = cloudDocsByDateString[logDateKey] else {
+                    print("⚠️ No cloud document found for DailyLog date \(logDateKey)")
+                    continue
+                }
+                
+                let foodItemIds = data["foodItemIds"] as? [String] ?? []
+                let exerciseItemIds = data["exerciseItemIds"] as? [String] ?? []
+                
+                print("🔧 Repairing DailyLog for \(logDateKey): \(foodItemIds.count) food items, \(exerciseItemIds.count) exercise items")
+                
+                if foodItemIds.isEmpty && exerciseItemIds.isEmpty {
+                    print("🔧 Skipping — no item IDs in cloud document")
+                    continue
+                }
+                
+                try await associateItemsWithDailyLog(log, foodItemIds: foodItemIds, exerciseItemIds: exerciseItemIds)
+            }
+            
+            print("🔧 Daily log association repair complete")
+        } catch {
+            print("⚠️ Failed to repair daily log associations: \(error)")
         }
     }
     
@@ -2078,8 +2370,19 @@ actor FirebaseSyncEngine {
         mutableItem.syncStatus = .pendingUpload
         
         do {
-            try await dataStore.insertFoodItem(mutableItem)
-            print("Saved FoodItem \(mutableItem.id) to local store")
+            // Try to fetch existing item to determine if we need insert or update
+            if let existing = try await dataStore.fetchFoodItem(byId: mutableItem.id) {
+                // Item exists - update it
+                existing.userId = userId
+                existing.lastModified = Date()
+                existing.syncStatus = .pendingUpload
+                try await dataStore.updateFoodItem(existing)
+                print("Updated FoodItem \(mutableItem.id) in local store")
+            } else {
+                // Item doesn't exist - insert it
+                try await dataStore.insertFoodItem(mutableItem)
+                print("Inserted FoodItem \(mutableItem.id) in local store")
+            }
         } catch {
             throw SyncError.dataStoreError(error)
         }
@@ -2113,8 +2416,19 @@ actor FirebaseSyncEngine {
         mutableItem.syncStatus = .pendingUpload
         
         do {
-            try await dataStore.insertExerciseItem(mutableItem)
-            print("Saved ExerciseItem \(mutableItem.id) to local store")
+            // Try to fetch existing item to determine if we need insert or update
+            if let existing = try await dataStore.fetchExerciseItem(byId: mutableItem.id) {
+                // Item exists - update it
+                existing.userId = userId
+                existing.lastModified = Date()
+                existing.syncStatus = .pendingUpload
+                try await dataStore.updateExerciseItem(existing)
+                print("Updated ExerciseItem \(mutableItem.id) in local store")
+            } else {
+                // Item doesn't exist - insert it
+                try await dataStore.insertExerciseItem(mutableItem)
+                print("Inserted ExerciseItem \(mutableItem.id) in local store")
+            }
         } catch {
             throw SyncError.dataStoreError(error)
         }

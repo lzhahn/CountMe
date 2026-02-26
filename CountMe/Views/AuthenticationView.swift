@@ -31,6 +31,9 @@ struct AuthenticationView: View {
     /// DataStore for local persistence
     @Environment(\.dataStore) private var dataStore
     
+    /// Profile sync service for syncing profile settings across devices
+    @Environment(\.profileSyncService) private var profileSyncService
+    
     /// Controls whether to show sign-up or sign-in view
     @State private var showSignUp = false
     
@@ -120,6 +123,15 @@ struct AuthenticationView: View {
         // Start real-time sync listeners
         print("🔄 Starting sync listeners for user: \(userId)")
         await syncEngine.startListening(userId: userId)
+        
+        // Download profile settings from cloud (so new devices get existing profile)
+        if let profileSyncService = profileSyncService {
+            do {
+                try await profileSyncService.downloadProfile(userId: userId)
+            } catch {
+                print("⚠️ Failed to download profile: \(error.localizedDescription)")
+            }
+        }
         
         // Trigger migration on first sign-in if local data exists and migration not attempted
         if !migrationAttempted {

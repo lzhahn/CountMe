@@ -14,9 +14,10 @@ struct CountMeApp: App {
     // Firebase Authentication Service
     @StateObject private var authService = FirebaseAuthService()
     
-    // Initialize Firebase on app startup
+    // Initialize Firebase on app startup and create shared services
     init() {
         FirebaseConfig.shared.configure()
+        self.services = SharedServices(modelContext: sharedModelContainer.mainContext)
     }
     
     var sharedModelContainer: ModelContainer = {
@@ -60,22 +61,29 @@ struct CountMeApp: App {
         }
     }()
     
-    // DataStore actor for local persistence
-    private var dataStore: DataStore {
-        DataStore(modelContext: sharedModelContainer.mainContext)
-    }
+    // Shared services — initialized once and reused across all views
+    private let services: SharedServices
     
-    // Firebase Sync Engine
-    private var syncEngine: FirebaseSyncEngine {
-        FirebaseSyncEngine(dataStore: dataStore)
+    /// Holds singleton service instances to prevent re-creation on every SwiftUI body evaluation
+    private class SharedServices {
+        let dataStore: DataStore
+        let syncEngine: FirebaseSyncEngine
+        let profileSyncService: ProfileSyncService
+        
+        init(modelContext: ModelContext) {
+            self.dataStore = DataStore(modelContext: modelContext)
+            self.syncEngine = FirebaseSyncEngine(dataStore: self.dataStore)
+            self.profileSyncService = ProfileSyncService()
+        }
     }
 
     var body: some Scene {
         WindowGroup {
             AuthenticationView()
                 .environmentObject(authService)
-                .environment(\.syncEngine, syncEngine)
-                .environment(\.dataStore, dataStore)
+                .environment(\.syncEngine, services.syncEngine)
+                .environment(\.dataStore, services.dataStore)
+                .environment(\.profileSyncService, services.profileSyncService)
         }
         .modelContainer(sharedModelContainer)
     }
@@ -102,5 +110,17 @@ extension EnvironmentValues {
     var dataStore: DataStore? {
         get { self[DataStoreKey.self] }
         set { self[DataStoreKey.self] = newValue }
+    }
+}
+
+// Environment key for ProfileSyncService
+private struct ProfileSyncServiceKey: EnvironmentKey {
+    static let defaultValue: ProfileSyncService? = nil
+}
+
+extension EnvironmentValues {
+    var profileSyncService: ProfileSyncService? {
+        get { self[ProfileSyncServiceKey.self] }
+        set { self[ProfileSyncServiceKey.self] = newValue }
     }
 }

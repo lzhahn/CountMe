@@ -53,7 +53,7 @@ final class CrashRecoveryTests: XCTestCase {
     func testDataRecoveryAfterCrash() async throws {
         // Phase 1: Create and save data before "crash"
         let beforeCrashDate = Date()
-        let foodItem1 = FoodItem(
+        let foodItem1 = try FoodItem(
             name: "Apple",
             calories: 95.0,
             timestamp: beforeCrashDate,
@@ -62,7 +62,7 @@ final class CrashRecoveryTests: XCTestCase {
             source: .manual
         )
         
-        let foodItem2 = FoodItem(
+        let foodItem2 = try FoodItem(
             name: "Banana",
             calories: 105.0,
             timestamp: beforeCrashDate.addingTimeInterval(3600),
@@ -71,7 +71,7 @@ final class CrashRecoveryTests: XCTestCase {
             source: .api
         )
         
-        let dailyLog = DailyLog(
+        let dailyLog = try DailyLog(
             date: beforeCrashDate,
             foodItems: [foodItem1, foodItem2],
             dailyGoal: 2000.0
@@ -132,24 +132,24 @@ final class CrashRecoveryTests: XCTestCase {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
         let twoDaysAgo = Calendar.current.date(byAdding: .day, value: -2, to: today)!
         
-        let log1 = DailyLog(
+        let log1 = try DailyLog(
             date: today,
-            foodItems: [FoodItem(name: "Lunch", calories: 500.0, source: .manual)],
+            foodItems: [try FoodItem(name: "Lunch", calories: 500.0, source: .manual)],
             dailyGoal: 2000.0
         )
         
-        let log2 = DailyLog(
+        let log2 = try DailyLog(
             date: yesterday,
             foodItems: [
-                FoodItem(name: "Breakfast", calories: 300.0, source: .manual),
-                FoodItem(name: "Dinner", calories: 600.0, source: .api)
+                try FoodItem(name: "Breakfast", calories: 300.0, source: .manual),
+                try FoodItem(name: "Dinner", calories: 600.0, source: .api)
             ],
             dailyGoal: 1800.0
         )
         
-        let log3 = DailyLog(
+        let log3 = try DailyLog(
             date: twoDaysAgo,
-            foodItems: [FoodItem(name: "Snack", calories: 150.0, source: .manual)],
+            foodItems: [try FoodItem(name: "Snack", calories: 150.0, source: .manual)],
             dailyGoal: 2200.0
         )
         
@@ -186,15 +186,15 @@ final class CrashRecoveryTests: XCTestCase {
     func testModificationsPersistedAfterCrash() async throws {
         // Create initial data
         let date = Date()
-        let foodItem = FoodItem(name: "Original", calories: 100.0, source: .manual)
-        let dailyLog = DailyLog(date: date, foodItems: [foodItem], dailyGoal: 2000.0)
+        let foodItem = try FoodItem(name: "Original", calories: 100.0, source: .manual)
+        let dailyLog = try DailyLog(date: date, foodItems: [foodItem], dailyGoal: 2000.0)
         
         let dataStore = DataStore(modelContext: testContext)
         try await dataStore.saveDailyLog(dailyLog)
         
         // Modify the data
         dailyLog.dailyGoal = 2500.0
-        let newFoodItem = FoodItem(name: "Added", calories: 200.0, source: .api)
+        let newFoodItem = try FoodItem(name: "Added", calories: 200.0, source: .api)
         dailyLog.foodItems.append(newFoodItem)
         try await dataStore.saveDailyLog(dailyLog)
         
@@ -218,9 +218,9 @@ final class CrashRecoveryTests: XCTestCase {
     func testDeletionsPersistedAfterCrash() async throws {
         // Create initial data with multiple items
         let date = Date()
-        let item1 = FoodItem(name: "Keep", calories: 100.0, source: .manual)
-        let item2 = FoodItem(name: "Delete", calories: 200.0, source: .manual)
-        let dailyLog = DailyLog(date: date, foodItems: [item1, item2])
+        let item1 = try FoodItem(name: "Keep", calories: 100.0, source: .manual)
+        let item2 = try FoodItem(name: "Delete", calories: 200.0, source: .manual)
+        let dailyLog = try DailyLog(date: date, foodItems: [item1, item2])
         
         let dataStore = DataStore(modelContext: testContext)
         try await dataStore.saveDailyLog(dailyLog)
@@ -245,7 +245,7 @@ final class CrashRecoveryTests: XCTestCase {
     func testEmptyLogRecoveryAfterCrash() async throws {
         // Create empty log with just a goal
         let date = Date()
-        let emptyLog = DailyLog(date: date, foodItems: [], dailyGoal: 2000.0)
+        let emptyLog = try DailyLog(date: date, foodItems: [], dailyGoal: 2000.0)
         
         let dataStore = DataStore(modelContext: testContext)
         try await dataStore.saveDailyLog(emptyLog)
@@ -270,10 +270,10 @@ final class CrashRecoveryTests: XCTestCase {
         let timestamp1 = baseDate.addingTimeInterval(-7200) // 2 hours ago
         let timestamp2 = baseDate.addingTimeInterval(-3600) // 1 hour ago
         
-        let item1 = FoodItem(name: "First", calories: 100.0, timestamp: timestamp1, source: .manual)
-        let item2 = FoodItem(name: "Second", calories: 200.0, timestamp: timestamp2, source: .api)
+        let item1 = try FoodItem(name: "First", calories: 100.0, timestamp: timestamp1, source: .manual)
+        let item2 = try FoodItem(name: "Second", calories: 200.0, timestamp: timestamp2, source: .api)
         
-        let dailyLog = DailyLog(date: baseDate, foodItems: [item1, item2])
+        let dailyLog = try DailyLog(date: baseDate, foodItems: [item1, item2])
         
         let dataStore = DataStore(modelContext: testContext)
         try await dataStore.saveDailyLog(dailyLog)

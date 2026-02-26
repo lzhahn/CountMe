@@ -20,7 +20,7 @@ struct ServingSizeCalculatorTests {
     @Test("Apply 0.5x multiplier scales all values by half")
     func testHalfServingMultiplier() throws {
         // Given: An ingredient with known nutritional values
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "chicken breast",
             quantity: 6,
             unit: "oz",
@@ -48,7 +48,7 @@ struct ServingSizeCalculatorTests {
     @Test("Apply 2.0x multiplier scales all values by double")
     func testDoubleServingMultiplier() throws {
         // Given: An ingredient with known nutritional values
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "white rice",
             quantity: 1,
             unit: "cup",
@@ -72,7 +72,7 @@ struct ServingSizeCalculatorTests {
     @Test("Apply 1.0x multiplier preserves all values")
     func testIdentityMultiplier() throws {
         // Given: An ingredient
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "broccoli",
             quantity: 1,
             unit: "cup",
@@ -96,7 +96,7 @@ struct ServingSizeCalculatorTests {
     @Test("Apply multiplier to ingredient with nil macros")
     func testMultiplierWithNilMacros() throws {
         // Given: An ingredient with nil macro values
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "unknown food",
             quantity: 100,
             unit: "gram",
@@ -120,7 +120,7 @@ struct ServingSizeCalculatorTests {
     @Test("Apply multiplier preserves original ingredient immutability")
     func testImmutability() throws {
         // Given: An ingredient
-        let original = Ingredient(
+        let original = try! Ingredient(
             name: "test food",
             quantity: 10,
             unit: "oz",
@@ -148,7 +148,7 @@ struct ServingSizeCalculatorTests {
     @Test("Zero multiplier throws error")
     func testZeroMultiplierThrows() {
         // Given: An ingredient
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "test food",
             quantity: 10,
             unit: "oz",
@@ -164,7 +164,7 @@ struct ServingSizeCalculatorTests {
     @Test("Negative multiplier throws error")
     func testNegativeMultiplierThrows() {
         // Given: An ingredient
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "test food",
             quantity: 10,
             unit: "oz",
@@ -180,7 +180,7 @@ struct ServingSizeCalculatorTests {
     @Test("Error message contains multiplier value")
     func testErrorMessageContent() {
         // Given: An ingredient
-        let ingredient = Ingredient(
+        let ingredient = try! Ingredient(
             name: "test food",
             quantity: 10,
             unit: "oz",

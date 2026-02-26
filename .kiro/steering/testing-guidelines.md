@@ -106,7 +106,7 @@ func testAddFoodItem_ValidData_PersistsSuccessfully() async throws {
 func testSearch_ValidQuery_ReturnsResults() async throws {
     let client = NutritionAPIClient()
     
-    let results = try await client.search(query: "apple")
+    let results = try await client.searchFood(query: "apple")
     
     #expect(!results.isEmpty)
     #expect(results.allSatisfy { $0.calories >= 0 })
@@ -114,10 +114,14 @@ func testSearch_ValidQuery_ReturnsResults() async throws {
 
 @Test("Search handles timeout gracefully")
 func testSearch_Timeout_ThrowsError() async throws {
-    let client = NutritionAPIClient(timeout: 0.001)
+    // Create a custom URLSession with very short timeout
+    let config = URLSessionConfiguration.ephemeral
+    config.timeoutIntervalForRequest = 0.001
+    let session = URLSession(configuration: config)
+    let client = NutritionAPIClient(session: session)
     
-    await #expect(throws: APIError.timeout) {
-        try await client.search(query: "apple")
+    await #expect(throws: NutritionAPIError.timeout) {
+        try await client.searchFood(query: "apple")
     }
 }
 ```

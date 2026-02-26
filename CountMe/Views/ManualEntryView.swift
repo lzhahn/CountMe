@@ -308,7 +308,7 @@ struct ManualEntryView: View {
                     try await tracker.updateFoodItem(existingItem)
                 } else {
                     // Create new item
-                    let foodItem = FoodItem(
+                    let foodItem = try FoodItem(
                         name: trimmedName,
                         calories: calories,
                         timestamp: Date(),
@@ -326,6 +326,12 @@ struct ManualEntryView: View {
                 // Navigate back on success
                 await MainActor.run {
                     dismiss()
+                }
+            } catch let error as ValidationError {
+                // Display validation error message
+                await MainActor.run {
+                    isSaving = false
+                    validationError = error.localizedDescription
                 }
             } catch {
                 // Display error message
@@ -351,10 +357,7 @@ struct ManualEntryView: View {
     
     let tracker = CalorieTracker(
         dataStore: DataStore(modelContext: context),
-        apiClient: NutritionAPIClient(
-            consumerKey: "preview",
-            consumerSecret: "preview"
-        )
+        apiClient: NutritionAPIClient()
     )
     
     ManualEntryView(tracker: tracker)

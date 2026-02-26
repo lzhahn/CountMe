@@ -434,10 +434,7 @@ class BarcodeScannerViewController: UIViewController, AVCaptureMetadataOutputObj
     let dataStore = DataStore(modelContext: context)
     let tracker = CalorieTracker(
         dataStore: dataStore,
-        apiClient: NutritionAPIClient(
-            consumerKey: "preview",
-            consumerSecret: "preview"
-        )
+        apiClient: NutritionAPIClient()
     )
     
     BarcodeScannerView(tracker: tracker)

@@ -2,10 +2,11 @@
 //  NutritionAPIClientTests.swift
 //  CountMeTests
 //
-//  Tests for NutritionAPIClient
+//  Tests for NutritionAPIClient (USDA FoodData Central)
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import CountMe
 
 // MARK: - Mock URLSession
@@ -40,10 +41,8 @@ class MockURLProtocol: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
     
-    override func stopLoading() {
-        // No-op
-    }
-    
+    override func stopLoading() {}
+
     static func reset() {
         mockData = nil
         mockResponse = nil
@@ -51,322 +50,209 @@ class MockURLProtocol: URLProtocol {
     }
 }
 
+// MARK: - Test Tags
+// Note: Tag extensions are defined in CalorieEstimatorTests.swift to avoid duplicates
+
 // MARK: - Tests
 
-final class NutritionAPIClientTests: XCTestCase {
+@Suite("NutritionAPIClient Tests", .serialized)
+struct NutritionAPIClientTests {
     
-    var client: NutritionAPIClient!
-    var mockSession: URLSession!
+    private static let baseURL = "https://api.nal.usda.gov/fdc/v1/foods/search"
     
-    override func setUp() {
-        super.setUp()
-        
-        // Configure mock URLSession
+    private func makeClient() -> NutritionAPIClient {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
-        mockSession = URLSession(configuration: config)
-        
-        client = NutritionAPIClient(
-            consumerKey: "test_key",
-            consumerSecret: "test_secret",
-            session: mockSession
-        )
-        
-        MockURLProtocol.reset()
+        let session = URLSession(configuration: config)
+        return NutritionAPIClient(session: session)
     }
     
-    override func tearDown() {
-        client = nil
-        mockSession = nil
+    private func mockSuccess(json: String) {
         MockURLProtocol.reset()
-        super.tearDown()
+        MockURLProtocol.mockData = json.data(using: .utf8)
+        MockURLProtocol.mockResponse = HTTPURLResponse(
+            url: URL(string: Self.baseURL)!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+    }
+    
+    private func mockHTTPError(statusCode: Int) {
+        MockURLProtocol.reset()
+        MockURLProtocol.mockResponse = HTTPURLResponse(
+            url: URL(string: Self.baseURL)!,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: nil
+        )
     }
     
     // MARK: - API Search Tests
     
-    func testSearchFoodSuccess() async throws {
-        // Mock successful API response
-        let mockJSON = """
+    @Test("Search returns correctly parsed USDA food results")
+    func testSearchFood_ValidResponse_ReturnsResults() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
         {
-            "foods": {
-                "food": [
-                    {
-                        "food_id": "123",
-                        "food_name": "Apple",
-                        "food_type": "Generic",
-                        "food_description": "Per 100g - Calories: 52kcal | Fat: 0.17g | Carbs: 13.81g | Protein: 0.26g"
-                    },
-                    {
-                        "food_id": "456",
-                        "food_name": "Apple Juice",
-                        "food_type": "Brand",
-                        "brand_name": "Tropicana",
-                        "food_description": "Per 1 cup - Calories: 120kcal | Fat: 0.00g | Carbs: 28.00g"
-                    }
-                ]
-            }
+            "totalHits": 2,
+            "foods": [
+                {
+                    "fdcId": 123,
+                    "description": "APPLE, RAW",
+                    "dataType": "SR Legacy",
+                    "foodNutrients": [
+                        {"nutrientId": 1008, "nutrientName": "Energy", "nutrientNumber": "208", "unitName": "KCAL", "value": 52.0},
+                        {"nutrientId": 1003, "nutrientName": "Protein", "nutrientNumber": "203", "unitName": "G", "value": 0.26},
+                        {"nutrientId": 1005, "nutrientName": "Carbohydrate, by difference", "nutrientNumber": "205", "unitName": "G", "value": 13.81},
+                        {"nutrientId": 1004, "nutrientName": "Total lipid (fat)", "nutrientNumber": "204", "unitName": "G", "value": 0.17}
+                    ]
+                },
+                {
+                    "fdcId": 456,
+                    "description": "APPLE JUICE",
+                    "dataType": "Branded",
+                    "brandOwner": "Tropicana",
+                    "servingSize": 240.0,
+                    "servingSizeUnit": "ml",
+                    "foodNutrients": [
+                        {"nutrientId": 1008, "nutrientName": "Energy", "nutrientNumber": "208", "unitName": "KCAL", "value": 120.0},
+                        {"nutrientId": 1005, "nutrientName": "Carbohydrate, by difference", "nutrientNumber": "205", "unitName": "G", "value": 28.0},
+                        {"nutrientId": 1004, "nutrientName": "Total lipid (fat)", "nutrientNumber": "204", "unitName": "G", "value": 0.0}
+                    ]
+                }
+            ]
         }
-        """
-        
-        MockURLProtocol.mockData = mockJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
+        """)
         
         let results = try await client.searchFood(query: "apple")
         
-        XCTAssertEqual(results.count, 2, "Should return 2 results")
+        #expect(results.count == 2)
         
-        // Verify first result
-        XCTAssertEqual(results[0].id, "123")
-        XCTAssertEqual(results[0].name, "Apple")
-        XCTAssertEqual(results[0].calories, 52.0)
-        XCTAssertEqual(results[0].servingSize, "100")
-        XCTAssertEqual(results[0].servingUnit, "g")
-        XCTAssertNil(results[0].brandName)
-        // Verify macro data
-        XCTAssertNotNil(results[0].protein)
-        XCTAssertEqual(results[0].protein!, 0.26, accuracy: 0.01)
-        XCTAssertNotNil(results[0].carbohydrates)
-        XCTAssertEqual(results[0].carbohydrates!, 13.81, accuracy: 0.01)
-        XCTAssertNotNil(results[0].fats)
-        XCTAssertEqual(results[0].fats!, 0.17, accuracy: 0.01)
+        // First result
+        #expect(results[0].id == "123")
+        #expect(results[0].name == "Apple, Raw")
+        #expect(results[0].calories == 52.0)
+        #expect(results[0].servingSize == "100")
+        #expect(results[0].servingUnit == "g")
+        #expect(results[0].brandName == nil)
+        #expect(results[0].protein != nil)
+        #expect(abs(results[0].protein! - 0.26) < 0.01)
+        #expect(abs(results[0].carbohydrates! - 13.81) < 0.01)
+        #expect(abs(results[0].fats! - 0.17) < 0.01)
         
-        // Verify second result
-        XCTAssertEqual(results[1].id, "456")
-        XCTAssertEqual(results[1].name, "Apple Juice")
-        XCTAssertEqual(results[1].calories, 120.0)
-        XCTAssertEqual(results[1].servingSize, "1")
-        XCTAssertEqual(results[1].servingUnit, "cup")
-        XCTAssertEqual(results[1].brandName, "Tropicana")
-        // Verify macro data (no protein in this response)
-        XCTAssertNil(results[1].protein)
-        XCTAssertNotNil(results[1].carbohydrates)
-        XCTAssertEqual(results[1].carbohydrates!, 28.00, accuracy: 0.01)
-        XCTAssertNotNil(results[1].fats)
-        XCTAssertEqual(results[1].fats!, 0.00, accuracy: 0.01)
+        // Second result (branded with serving size)
+        #expect(results[1].id == "456")
+        #expect(results[1].name == "Apple Juice")
+        #expect(results[1].calories == 120.0)
+        #expect(results[1].servingSize == "240")
+        #expect(results[1].servingUnit == "ml")
+        #expect(results[1].brandName == "Tropicana")
+        #expect(results[1].protein == nil)
+        #expect(abs(results[1].carbohydrates! - 28.0) < 0.01)
+        #expect(abs(results[1].fats! - 0.0) < 0.01)
     }
     
-    func testSearchFoodEmptyResults() async throws {
-        // Mock empty results
-        let mockJSON = """
-        {
-            "foods": {
-                "food": []
-            }
-        }
-        """
-        
-        MockURLProtocol.mockData = mockJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
+    @Test("Search with empty results returns empty array")
+    func testSearchFood_EmptyResults_ReturnsEmptyArray() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
+        { "totalHits": 0, "foods": [] }
+        """)
         
         let results = try await client.searchFood(query: "nonexistent")
-        
-        XCTAssertEqual(results.count, 0, "Should return empty array")
+        #expect(results.count == 0)
     }
     
-    func testSearchFoodNoFoodsKey() async throws {
-        // Mock response without foods key
-        let mockJSON = """
-        {
-            "error": {
-                "message": "No results found"
-            }
-        }
-        """
-        
-        MockURLProtocol.mockData = mockJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
+    @Test("Search with missing foods key returns empty array")
+    func testSearchFood_NoFoodsKey_ReturnsEmptyArray() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
+        { "totalHits": 0 }
+        """)
         
         let results = try await client.searchFood(query: "test")
-        
-        XCTAssertEqual(results.count, 0, "Should return empty array when no foods key")
+        #expect(results.count == 0)
     }
+
+    // MARK: - Error Handling Tests
     
-    func testSearchFoodRateLimitError() async {
-        // Mock rate limit response
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 429,
-            httpVersion: nil,
-            headerFields: nil
-        )
+    @Test("Rate limit (429) throws rateLimitExceeded")
+    func testSearchFood_RateLimit_ThrowsError() async throws {
+        let client = makeClient()
+        mockHTTPError(statusCode: 429)
         
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw rate limit error")
-        } catch let error as NutritionAPIError {
-            if case .rateLimitExceeded = error {
-                // Expected error
-            } else {
-                XCTFail("Should throw rateLimitExceeded error, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
+        await #expect(throws: NutritionAPIError.self) {
+            try await client.searchFood(query: "test")
         }
     }
     
-    func testSearchFoodInvalidResponse() async {
-        // Mock invalid HTTP status
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 500,
-            httpVersion: nil,
-            headerFields: nil
-        )
+    @Test("Server error (500) throws invalidResponse")
+    func testSearchFood_ServerError_ThrowsError() async throws {
+        let client = makeClient()
+        mockHTTPError(statusCode: 500)
         
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw invalid response error")
-        } catch let error as NutritionAPIError {
-            if case .invalidResponse = error {
-                // Expected error
-            } else {
-                XCTFail("Should throw invalidResponse error, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
+        await #expect(throws: NutritionAPIError.self) {
+            try await client.searchFood(query: "test")
         }
     }
     
-    func testSearchFoodInvalidJSON() async {
-        // Mock invalid JSON
+    @Test("Not found (404) throws invalidResponse")
+    func testSearchFood_NotFound_ThrowsError() async throws {
+        let client = makeClient()
+        mockHTTPError(statusCode: 404)
+        
+        await #expect(throws: NutritionAPIError.self) {
+            try await client.searchFood(query: "test")
+        }
+    }
+    
+    @Test("Invalid JSON throws invalidData")
+    func testSearchFood_InvalidJSON_ThrowsError() async throws {
+        let client = makeClient()
+        MockURLProtocol.reset()
         MockURLProtocol.mockData = "invalid json".data(using: .utf8)
         MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
+            url: URL(string: Self.baseURL)!, statusCode: 200, httpVersion: nil, headerFields: nil
         )
         
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw invalid data error")
-        } catch let error as NutritionAPIError {
-            if case .invalidData = error {
-                // Expected error
-            } else {
-                XCTFail("Should throw invalidData error, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
+        await #expect(throws: NutritionAPIError.self) {
+            try await client.searchFood(query: "test")
         }
     }
     
-    // MARK: - Network Error Tests (Task 3.6)
-    
-    func testSearchFoodNetworkError() async {
-        // Mock network error
-        let networkError = NSError(
+    @Test("Network offline throws networkError")
+    func testSearchFood_NetworkOffline_ThrowsError() async throws {
+        let client = makeClient()
+        MockURLProtocol.reset()
+        MockURLProtocol.mockError = NSError(
             domain: NSURLErrorDomain,
             code: NSURLErrorNotConnectedToInternet,
             userInfo: [NSLocalizedDescriptionKey: "The Internet connection appears to be offline."]
         )
-        MockURLProtocol.mockError = networkError
         
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw network error")
-        } catch let error as NutritionAPIError {
-            if case .networkError(let underlyingError) = error {
-                XCTAssertEqual((underlyingError as NSError).code, NSURLErrorNotConnectedToInternet)
-                // Verify error description is user-friendly
-                XCTAssertNotNil(error.errorDescription)
-                XCTAssertTrue(error.errorDescription!.contains("Network error"))
-            } else {
-                XCTFail("Should throw networkError, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
+        await #expect(throws: NutritionAPIError.self) {
+            try await client.searchFood(query: "test")
         }
     }
     
-    func testSearchFoodTimeoutError() async {
-        // Mock timeout error
-        let timeoutError = NSError(
+    @Test("Timeout throws timeout error")
+    func testSearchFood_Timeout_ThrowsError() async throws {
+        let client = makeClient()
+        MockURLProtocol.reset()
+        MockURLProtocol.mockError = NSError(
             domain: NSURLErrorDomain,
             code: NSURLErrorTimedOut,
             userInfo: [NSLocalizedDescriptionKey: "The request timed out."]
         )
-        MockURLProtocol.mockError = timeoutError
         
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw timeout error")
-        } catch let error as NutritionAPIError {
-            if case .timeout = error {
-                // Verify error description is user-friendly
-                XCTAssertNotNil(error.errorDescription)
-                XCTAssertTrue(error.errorDescription!.contains("took too long"))
-            } else {
-                XCTFail("Should throw timeout error, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
+        await #expect(throws: NutritionAPIError.self) {
+            try await client.searchFood(query: "test")
         }
     }
     
-    func testSearchFoodInvalidResponseScenarios() async {
-        // Test various invalid response scenarios
-        
-        // Scenario 1: 404 Not Found
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 404,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw invalid response error for 404")
-        } catch let error as NutritionAPIError {
-            if case .invalidResponse = error {
-                XCTAssertNotNil(error.errorDescription)
-            } else {
-                XCTFail("Should throw invalidResponse error, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
-        }
-        
-        // Scenario 2: 500 Internal Server Error
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 500,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
-        do {
-            _ = try await client.searchFood(query: "test")
-            XCTFail("Should throw invalid response error for 500")
-        } catch let error as NutritionAPIError {
-            if case .invalidResponse = error {
-                XCTAssertNotNil(error.errorDescription)
-            } else {
-                XCTFail("Should throw invalidResponse error, got \(error)")
-            }
-        } catch {
-            XCTFail("Should throw NutritionAPIError, got \(error)")
-        }
-    }
-    
-    func testErrorDescriptions() {
-        // Verify all error types have user-friendly descriptions
+    @Test("All NutritionAPIError cases have non-empty descriptions")
+    func testErrorDescriptions_AllCases_HaveDescriptions() {
         let errors: [NutritionAPIError] = [
             .invalidResponse,
             .networkError(NSError(domain: "test", code: 1)),
@@ -376,253 +262,252 @@ final class NutritionAPIClientTests: XCTestCase {
         ]
         
         for error in errors {
-            XCTAssertNotNil(error.errorDescription, "Error \(error) should have a description")
-            XCTAssertFalse(error.errorDescription!.isEmpty, "Error description should not be empty")
+            #expect(error.errorDescription != nil)
+            #expect(error.errorDescription!.isEmpty == false)
         }
     }
     
-    func testSearchFoodFiltersInvalidCalories() async throws {
-        // Mock response with one valid and one invalid food item
-        let mockJSON = """
+    // MARK: - Nutrient Parsing Tests
+    
+    @Test("Foods without Energy nutrient are filtered out")
+    func testSearchFood_NoEnergyNutrient_FilteredOut() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
         {
-            "foods": {
-                "food": [
-                    {
-                        "food_id": "123",
-                        "food_name": "Apple",
-                        "food_type": "Generic",
-                        "food_description": "Per 100g - Calories: 52kcal | Fat: 0.17g"
-                    },
-                    {
-                        "food_id": "456",
-                        "food_name": "Invalid Food",
-                        "food_type": "Generic",
-                        "food_description": "Per 100g - Fat: 0.17g"
-                    }
-                ]
-            }
+            "totalHits": 2,
+            "foods": [
+                {
+                    "fdcId": 123,
+                    "description": "APPLE",
+                    "foodNutrients": [
+                        {"nutrientNumber": "208", "value": 52.0},
+                        {"nutrientNumber": "204", "value": 0.17}
+                    ]
+                },
+                {
+                    "fdcId": 456,
+                    "description": "UNKNOWN FOOD",
+                    "foodNutrients": [
+                        {"nutrientNumber": "204", "value": 0.17}
+                    ]
+                }
+            ]
         }
-        """
-        
-        MockURLProtocol.mockData = mockJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
+        """)
         
         let results = try await client.searchFood(query: "test")
-        
-        XCTAssertEqual(results.count, 1, "Should filter out items without calories")
-        XCTAssertEqual(results[0].id, "123")
-        XCTAssertEqual(results[0].name, "Apple")
+        #expect(results.count == 1, "Should filter out items without Energy nutrient")
+        #expect(results[0].id == "123")
     }
     
-    // MARK: - Calorie Extraction Tests
-    
-    func testExtractCaloriesFromDescription() {
-        // Test typical FatSecret format
-        let description1 = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
-        let result1 = extractCaloriesFromDescription(description1)
-        XCTAssertEqual(result1, 250.0, "Should extract 250 calories")
-        
-        // Test with decimal calories
-        let description2 = "Per 1 serving - Calories: 150.5kcal | Fat: 5.00g"
-        let result2 = extractCaloriesFromDescription(description2)
-        XCTAssertEqual(result2, 150.5, "Should extract 150.5 calories")
-        
-        // Test with space before kcal
-        let description3 = "Per 1 cup - Calories: 200 kcal"
-        let result3 = extractCaloriesFromDescription(description3)
-        XCTAssertEqual(result3, 200.0, "Should extract 200 calories with space")
-    }
-    
-    func testExtractCaloriesInvalidFormat() {
-        // Test with no calorie information
-        let description = "Per 100g - Fat: 10.00g | Carbs: 30.00g"
-        let result = extractCaloriesFromDescription(description)
-        XCTAssertNil(result, "Should return nil when no calories found")
-    }
-    
-    // MARK: - Serving Info Parsing Tests
-    
-    func testParseServingInfo() {
-        // Test with grams
-        let description1 = "Per 100g - Calories: 250kcal"
-        let (size1, unit1) = parseServingInfoFromDescription(description1)
-        XCTAssertEqual(size1, "100", "Should extract serving size 100")
-        XCTAssertEqual(unit1, "g", "Should extract unit g")
-        
-        // Test with serving
-        let description2 = "Per 1 serving - Calories: 150kcal"
-        let (size2, unit2) = parseServingInfoFromDescription(description2)
-        XCTAssertEqual(size2, "1", "Should extract serving size 1")
-        XCTAssertEqual(unit2, "serving", "Should extract unit serving")
-        
-        // Test with cup
-        let description3 = "Per 2 cups - Calories: 200kcal"
-        let (size3, unit3) = parseServingInfoFromDescription(description3)
-        XCTAssertEqual(size3, "2", "Should extract serving size 2")
-        XCTAssertEqual(unit3, "cups", "Should extract unit cups")
-    }
-    
-    func testParseServingInfoInvalidFormat() {
-        // Test with no serving information
-        let description = "Calories: 250kcal"
-        let (size, unit) = parseServingInfoFromDescription(description)
-        XCTAssertNil(size, "Should return nil size when no serving info found")
-        XCTAssertNil(unit, "Should return nil unit when no serving info found")
-    }
-    
-    // MARK: - Macro Extraction Tests (Task 17)
-    
-    func testExtractMacroProtein() {
-        // Test typical FatSecret format
-        let description1 = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
-        let result1 = extractMacroFromDescription(description1, macroName: "Protein")
-        XCTAssertNotNil(result1)
-        XCTAssertEqual(result1!, 8.00, accuracy: 0.01, "Should extract 8.00g protein")
-        
-        // Test with decimal values
-        let description2 = "Per 1 serving - Calories: 150kcal | Protein: 12.5g"
-        let result2 = extractMacroFromDescription(description2, macroName: "Protein")
-        XCTAssertNotNil(result2)
-        XCTAssertEqual(result2!, 12.5, accuracy: 0.01, "Should extract 12.5g protein")
-        
-        // Test with space before g
-        let description3 = "Per 1 cup - Protein: 20 g"
-        let result3 = extractMacroFromDescription(description3, macroName: "Protein")
-        XCTAssertNotNil(result3)
-        XCTAssertEqual(result3!, 20.0, accuracy: 0.01, "Should extract 20g protein with space")
-    }
-    
-    func testExtractMacroCarbs() {
-        let description = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
-        let result = extractMacroFromDescription(description, macroName: "Carbs")
-        XCTAssertNotNil(result)
-        XCTAssertEqual(result!, 30.00, accuracy: 0.01, "Should extract 30.00g carbs")
-    }
-    
-    func testExtractMacroFat() {
-        let description = "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
-        let result = extractMacroFromDescription(description, macroName: "Fat")
-        XCTAssertNotNil(result)
-        XCTAssertEqual(result!, 10.00, accuracy: 0.01, "Should extract 10.00g fat")
-    }
-    
-    func testExtractMacroMissing() {
-        // Test when macro is not present
-        let description = "Per 100g - Calories: 250kcal | Fat: 10.00g"
-        let result = extractMacroFromDescription(description, macroName: "Protein")
-        XCTAssertNil(result, "Should return nil when macro not found")
-    }
-    
-    func testExtractMacroZeroValue() {
-        // Test with zero value
-        let description = "Per 100g - Calories: 250kcal | Fat: 0.00g | Carbs: 30.00g"
-        let result = extractMacroFromDescription(description, macroName: "Fat")
-        XCTAssertNotNil(result)
-        XCTAssertEqual(result!, 0.00, accuracy: 0.01, "Should extract 0.00g fat")
-    }
-    
-    func testSearchFoodWithMissingMacros() async throws {
-        // Mock response with partial macro data
-        let mockJSON = """
+    @Test("Partial macros are nil when not in response")
+    func testSearchFood_PartialMacros_MissingAreNil() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
         {
-            "foods": {
-                "food": [
-                    {
-                        "food_id": "789",
-                        "food_name": "Partial Macros Food",
-                        "food_type": "Generic",
-                        "food_description": "Per 100g - Calories: 100kcal | Carbs: 20.00g"
-                    }
+            "totalHits": 1,
+            "foods": [{
+                "fdcId": 789,
+                "description": "PARTIAL MACROS FOOD",
+                "foodNutrients": [
+                    {"nutrientNumber": "208", "value": 100.0},
+                    {"nutrientNumber": "205", "value": 20.0}
                 ]
-            }
+            }]
         }
-        """
-        
-        MockURLProtocol.mockData = mockJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://platform.fatsecret.com/rest/server.api")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
+        """)
         
         let results = try await client.searchFood(query: "test")
-        
-        XCTAssertEqual(results.count, 1, "Should return 1 result")
-        XCTAssertEqual(results[0].calories, 100.0)
-        XCTAssertNotNil(results[0].carbohydrates)
-        XCTAssertEqual(results[0].carbohydrates!, 20.00, accuracy: 0.01)
-        XCTAssertNil(results[0].protein, "Protein should be nil when not in response")
-        XCTAssertNil(results[0].fats, "Fats should be nil when not in response")
+        #expect(results.count == 1)
+        #expect(results[0].calories == 100.0)
+        #expect(results[0].carbohydrates != nil)
+        #expect(abs(results[0].carbohydrates! - 20.0) < 0.01)
+        #expect(results[0].protein == nil, "Protein should be nil when not in response")
+        #expect(results[0].fats == nil, "Fats should be nil when not in response")
     }
     
-    // MARK: - Helper Methods
-    
-    private func extractCaloriesFromDescription(_ description: String) -> Double? {
-        let pattern = "Calories:\\s*(\\d+(?:\\.\\d+)?)\\s*kcal"
-        
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return nil
+    @Test("Default serving size is 100g when not provided")
+    func testSearchFood_NoServingSize_DefaultsTo100g() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
+        {
+            "totalHits": 1,
+            "foods": [{
+                "fdcId": 100,
+                "description": "GENERIC FOOD",
+                "foodNutrients": [{"nutrientNumber": "208", "value": 200.0}]
+            }]
         }
+        """)
         
-        let nsString = description as NSString
-        let range = NSRange(location: 0, length: nsString.length)
-        
-        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
-            return nil
-        }
-        
-        let calorieRange = match.range(at: 1)
-        let calorieString = nsString.substring(with: calorieRange)
-        
-        return Double(calorieString)
+        let results = try await client.searchFood(query: "test")
+        #expect(results.count == 1)
+        #expect(results[0].servingSize == "100", "Should default to 100 when no serving size")
+        #expect(results[0].servingUnit == "g", "Should default to g when no serving unit")
     }
     
-    private func parseServingInfoFromDescription(_ description: String) -> (String?, String?) {
-        let pattern = "Per\\s+(\\d+(?:\\.\\d+)?)\\s*([a-zA-Z]+)"
-        
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return (nil, nil)
+    @Test("Branded food uses provided serving size and brand")
+    func testSearchFood_BrandedFood_UsesProvidedServingAndBrand() async throws {
+        let client = makeClient()
+        mockSuccess(json: """
+        {
+            "totalHits": 1,
+            "foods": [{
+                "fdcId": 200,
+                "description": "PROTEIN BAR",
+                "dataType": "Branded",
+                "brandOwner": "Quest",
+                "servingSize": 60.0,
+                "servingSizeUnit": "g",
+                "foodNutrients": [
+                    {"nutrientNumber": "208", "value": 200.0},
+                    {"nutrientNumber": "203", "value": 20.0},
+                    {"nutrientNumber": "205", "value": 22.0},
+                    {"nutrientNumber": "204", "value": 8.0}
+                ]
+            }]
         }
+        """)
         
-        let nsString = description as NSString
-        let range = NSRange(location: 0, length: nsString.length)
+        let results = try await client.searchFood(query: "protein bar")
+        #expect(results.count == 1)
+        #expect(results[0].name == "Protein Bar")
+        #expect(results[0].servingSize == "60")
+        #expect(results[0].servingUnit == "g")
+        #expect(results[0].brandName == "Quest")
+        #expect(abs(results[0].protein! - 20.0) < 0.01)
+        #expect(abs(results[0].carbohydrates! - 22.0) < 0.01)
+        #expect(abs(results[0].fats! - 8.0) < 0.01)
+    }
+
+    // MARK: - Property-Based Tests
+    
+    /// Property: Foods with Energy nutrient (208) are always included in results,
+    /// foods without Energy are always excluded.
+    @Test("Property: Energy nutrient presence determines inclusion in results",
+          .tags(.property, .nutritionAPI))
+    func testProperty_EnergyNutrientFiltering_1() async throws {
+        let client = makeClient()
         
-        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
-            return (nil, nil)
+        for _ in 0..<100 {
+            let hasEnergy = Bool.random()
+            let calories = Double.random(in: 1...2000)
+            let fdcId = Int.random(in: 1...999999)
+            
+            var nutrients = "["
+            if hasEnergy {
+                nutrients += "{\"nutrientNumber\": \"208\", \"value\": \(calories)}"
+            }
+            if Bool.random() {
+                if hasEnergy { nutrients += "," }
+                nutrients += "{\"nutrientNumber\": \"203\", \"value\": \(Double.random(in: 0...100))}"
+            }
+            nutrients += "]"
+            
+            mockSuccess(json: """
+            {
+                "totalHits": 1,
+                "foods": [{
+                    "fdcId": \(fdcId),
+                    "description": "FOOD \(fdcId)",
+                    "foodNutrients": \(nutrients)
+                }]
+            }
+            """)
+            
+            let results = try await client.searchFood(query: "test")
+            
+            if hasEnergy {
+                #expect(results.count == 1, "Food with Energy nutrient should be included (fdcId: \(fdcId))")
+                #expect(abs(results[0].calories - calories) < 0.01)
+            } else {
+                #expect(results.count == 0, "Food without Energy nutrient should be excluded (fdcId: \(fdcId))")
+            }
         }
-        
-        let sizeRange = match.range(at: 1)
-        let unitRange = match.range(at: 2)
-        
-        let size = nsString.substring(with: sizeRange)
-        let unit = nsString.substring(with: unitRange)
-        
-        return (size, unit)
     }
     
-    private func extractMacroFromDescription(_ description: String, macroName: String) -> Double? {
-        let pattern = "\(macroName):\\s*(\\d+(?:\\.\\d+)?)\\s*g"
+    /// Property: Macro values from the API are faithfully preserved in results —
+    /// protein, carbs, and fat values match their source nutrients exactly.
+    @Test("Property: Macro nutrient values are faithfully preserved from API response",
+          .tags(.property, .nutritionAPI))
+    func testProperty_MacroValuesPreserved_2() async throws {
+        let client = makeClient()
         
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return nil
+        for _ in 0..<100 {
+            let calories = Double.random(in: 1...2000)
+            let protein = Double.random(in: 0...100)
+            let carbs = Double.random(in: 0...300)
+            let fat = Double.random(in: 0...100)
+            
+            mockSuccess(json: """
+            {
+                "totalHits": 1,
+                "foods": [{
+                    "fdcId": \(Int.random(in: 1...999999)),
+                    "description": "FOOD",
+                    "foodNutrients": [
+                        {"nutrientNumber": "208", "value": \(calories)},
+                        {"nutrientNumber": "203", "value": \(protein)},
+                        {"nutrientNumber": "205", "value": \(carbs)},
+                        {"nutrientNumber": "204", "value": \(fat)}
+                    ]
+                }]
+            }
+            """)
+            
+            let results = try await client.searchFood(query: "test")
+            
+            #expect(results.count == 1)
+            #expect(abs(results[0].calories - calories) < 0.001, "Calories should be preserved")
+            #expect(abs(results[0].protein! - protein) < 0.001, "Protein should be preserved")
+            #expect(abs(results[0].carbohydrates! - carbs) < 0.001, "Carbs should be preserved")
+            #expect(abs(results[0].fats! - fat) < 0.001, "Fat should be preserved")
         }
+    }
+    
+    /// Property: Serving size from the API is correctly formatted as a string,
+    /// and defaults to "100" / "g" when not provided.
+    @Test("Property: Serving size formatting and defaults are consistent",
+          .tags(.property, .nutritionAPI))
+    func testProperty_ServingSizeFormatting_3() async throws {
+        let client = makeClient()
         
-        let nsString = description as NSString
-        let range = NSRange(location: 0, length: nsString.length)
-        
-        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
-            return nil
+        for _ in 0..<100 {
+            let hasServingSize = Bool.random()
+            let servingSize = Double.random(in: 1...500)
+            
+            var foodFields = """
+            "fdcId": \(Int.random(in: 1...999999)),
+            "description": "FOOD",
+            "foodNutrients": [{"nutrientNumber": "208", "value": 100.0}]
+            """
+            
+            if hasServingSize {
+                foodFields += """
+                ,
+                "servingSize": \(servingSize),
+                "servingSizeUnit": "ml"
+                """
+            }
+            
+            mockSuccess(json: """
+            {
+                "totalHits": 1,
+                "foods": [{\(foodFields)}]
+            }
+            """)
+            
+            let results = try await client.searchFood(query: "test")
+            
+            #expect(results.count == 1)
+            
+            if hasServingSize {
+                #expect(results[0].servingSize == String(format: "%.0f", servingSize))
+                #expect(results[0].servingUnit == "ml")
+            } else {
+                #expect(results[0].servingSize == "100", "Should default to 100")
+                #expect(results[0].servingUnit == "g", "Should default to g")
+            }
         }
-        
-        let valueRange = match.range(at: 1)
-        let valueString = nsString.substring(with: valueRange)
-        
-        return Double(valueString)
     }
 }

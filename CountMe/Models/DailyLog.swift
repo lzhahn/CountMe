@@ -62,6 +62,7 @@ final class DailyLog: SyncableEntity {
         foodItems.reduce(0) { $0 + ($1.fats ?? 0) }
     }
     
+    /// Public throwing initializer with validation
     init(
         id: UUID = UUID(),
         date: Date,
@@ -71,6 +72,38 @@ final class DailyLog: SyncableEntity {
         userId: String = "",
         lastModified: Date = Date(),
         syncStatus: SyncStatus = .pendingUpload
+    ) throws {
+        // Validate optional dailyGoal
+        if let dailyGoal = dailyGoal {
+            guard dailyGoal >= 0 else {
+                throw ValidationError.negativeGoal(value: dailyGoal)
+            }
+            guard dailyGoal <= ValidationConstants.maxDailyGoal else {
+                throw ValidationError.goalExceedMax(value: dailyGoal, max: ValidationConstants.maxDailyGoal)
+            }
+        }
+        
+        // Assign properties after validation
+        self._id = id
+        self.date = date
+        self.foodItems = foodItems
+        self.exerciseItems = exerciseItems
+        self.dailyGoal = dailyGoal
+        self.userId = userId
+        self.lastModified = lastModified
+        self.syncStatus = syncStatus
+    }
+    
+    /// Internal non-throwing initializer for deserialization (skips validation)
+    internal init(
+        validated id: UUID,
+        date: Date,
+        foodItems: [FoodItem],
+        exerciseItems: [ExerciseItem],
+        dailyGoal: Double?,
+        userId: String,
+        lastModified: Date,
+        syncStatus: SyncStatus
     ) {
         self._id = id
         self.date = date
@@ -136,10 +169,21 @@ extension DailyLog {
         // Extract optional fields
         let dailyGoal = data["dailyGoal"] as? Double
         
+        // Range validation (Requirement 6.7, 6.8)
+        if let dailyGoal = dailyGoal {
+            guard dailyGoal >= 0 else {
+                throw SyncError.invalidData(reason: "DailyLog dailyGoal \(dailyGoal) is negative")
+            }
+            guard dailyGoal <= ValidationConstants.maxDailyGoal else {
+                throw SyncError.invalidData(reason: "DailyLog dailyGoal \(dailyGoal) exceeds maximum of \(ValidationConstants.maxDailyGoal)")
+            }
+        }
+        
+        // Use internal validated initializer (skips validation since we just validated)
         // Note: foodItems will be populated separately by the sync engine
         // using the foodItemIds array from the data
         return DailyLog(
-            id: id,
+            validated: id,
             date: date,
             foodItems: [],
             exerciseItems: [],

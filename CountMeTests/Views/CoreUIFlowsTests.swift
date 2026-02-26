@@ -37,8 +37,7 @@ final class CoreUIFlowsTests: XCTestCase {
         // Initialize dependencies
         dataStore = CountMe.DataStore(modelContext: modelContext)
         apiClient = NutritionAPIClient(
-            consumerKey: "test_key",
-            consumerSecret: "test_secret"
+            apiKey: "test_key"
         )
         
         // Initialize tracker on main actor

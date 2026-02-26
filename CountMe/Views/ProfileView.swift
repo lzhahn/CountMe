@@ -22,9 +22,16 @@ struct ProfileView: View {
     let syncEngine: FirebaseSyncEngine?
     let dataStore: DataStore?
     
+    @Environment(\.profileSyncService) private var profileSyncService
+    
     @AppStorage("exerciseBodyWeightKg") private var bodyWeightKg: Double = 70
     @AppStorage("exerciseBodyWeightUnit") private var bodyWeightUnit: String = "kg"
     @AppStorage("weightLossLbsPerWeek") private var weightLossLbsPerWeek: Double = 1.0
+    @AppStorage("userHeightCm") private var heightCm: Double = 170
+    @AppStorage("userHeightUnit") private var heightUnit: String = "cm"
+    @AppStorage("userAge") private var age: Int = 30
+    @AppStorage("userSex") private var sex: String = "male"
+    @AppStorage("userActivityLevel") private var activityLevel: String = "moderate"
     
     @State private var showDeleteConfirmation = false
     @State private var isDeletingAccount = false
@@ -37,6 +44,9 @@ struct ProfileView: View {
             List {
                 // Account Information Section
                 accountInfoSection
+                
+                // Personal info for calorie estimation
+                personalInfoSection
                 
                 // Exercise settings
                 exerciseSettingsSection
@@ -63,6 +73,38 @@ struct ProfileView: View {
                 if let error = deletionError {
                     Text(error)
                 }
+            }
+            .onDisappear {
+                uploadProfileIfAuthenticated()
+            }
+            .onChange(of: bodyWeightKg) { markProfileModified() }
+            .onChange(of: bodyWeightUnit) { markProfileModified() }
+            .onChange(of: weightLossLbsPerWeek) { markProfileModified() }
+            .onChange(of: heightCm) { markProfileModified() }
+            .onChange(of: heightUnit) { markProfileModified() }
+            .onChange(of: age) { markProfileModified() }
+            .onChange(of: sex) { markProfileModified() }
+            .onChange(of: activityLevel) { markProfileModified() }
+        }
+    }
+    
+    // MARK: - Profile Sync Helpers
+    
+    /// Marks the local profile as modified so it will be uploaded
+    private func markProfileModified() {
+        UserDefaults.standard.set(Date(), forKey: "profileLastModified")
+    }
+    
+    /// Uploads profile settings to Firestore if the user is authenticated
+    private func uploadProfileIfAuthenticated() {
+        guard let userId = authService.currentUser?.uid,
+              let profileSyncService = profileSyncService else { return }
+        
+        Task {
+            do {
+                try await profileSyncService.uploadProfile(userId: userId)
+            } catch {
+                print("⚠️ Failed to upload profile: \(error.localizedDescription)")
             }
         }
     }
@@ -91,6 +133,83 @@ struct ProfileView: View {
             .padding(.vertical, 8)
         } header: {
             Text("Account Information")
+        }
+    }
+    
+    // MARK: - Personal Info Section
+    
+    private var personalInfoSection: some View {
+        Section {
+            Picker("Sex", selection: $sex) {
+                Text("Male").tag("male")
+                Text("Female").tag("female")
+            }
+            
+            HStack {
+                Text("Age")
+                Spacer()
+                TextField("Age", value: $age, format: .number)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 60)
+                Text("years")
+                    .foregroundColor(.secondary)
+            }
+            
+            Picker("Height Unit", selection: $heightUnit) {
+                Text("cm").tag("cm")
+                Text("ft").tag("ft")
+            }
+            .pickerStyle(.segmented)
+            
+            if heightUnit == "cm" {
+                HStack {
+                    Text("Height")
+                    Spacer()
+                    TextField("cm", value: $heightCm, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                    Text("cm")
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                HStack {
+                    Text("Height")
+                    Spacer()
+                    TextField("ft", value: heightFeetBinding, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 40)
+                    Text("ft")
+                        .foregroundColor(.secondary)
+                    TextField("in", value: heightInchesBinding, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 40)
+                    Text("in")
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            HStack {
+                Spacer()
+                Text("≈ \(heightConversionLabel)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Picker("Activity Level", selection: $activityLevel) {
+                Text("Sedentary (desk job)").tag("sedentary")
+                Text("Lightly Active (some walking)").tag("light")
+                Text("Moderately Active (on feet most of day)").tag("moderate")
+                Text("Very Active (physical job)").tag("very")
+            }
+        } header: {
+            Text("Personal Info")
+        } footer: {
+            Text("Set your baseline daily activity. Exercise calories are tracked separately via the exercise tracker.")
+                .font(.caption)
         }
     }
     
@@ -169,14 +288,23 @@ struct ProfileView: View {
         } header: {
             Text("Goals")
         } footer: {
-            Text("Estimates use body weight and a standard maintenance formula. Adjust as needed for your activity level and results.")
+            Text("Estimates use the Mifflin-St Jeor equation with your personal info and activity level.")
                 .font(.caption)
         }
     }
     
+    private var activityMultiplier: Double {
+        (CalorieEstimator.ActivityLevel(rawValue: activityLevel) ?? .moderate).multiplier
+    }
+    
     private var estimatedMaintenanceCalories: Double {
-        let weightLb = bodyWeightKg * 2.20462
-        return max(weightLb * 14.0, 0)
+        CalorieEstimator.maintenance(
+            weightKg: bodyWeightKg,
+            heightCm: heightCm,
+            age: age,
+            sex: CalorieEstimator.Sex(rawValue: sex) ?? .male,
+            activity: CalorieEstimator.ActivityLevel(rawValue: activityLevel) ?? .moderate
+        )
     }
     
     private var dailyCalorieDeficit: Double {
@@ -184,7 +312,14 @@ struct ProfileView: View {
     }
     
     private var suggestedDailyCalories: Double {
-        max(estimatedMaintenanceCalories - dailyCalorieDeficit, 0)
+        CalorieEstimator.suggestedCalories(
+            weightKg: bodyWeightKg,
+            heightCm: heightCm,
+            age: age,
+            sex: CalorieEstimator.Sex(rawValue: sex) ?? .male,
+            activity: CalorieEstimator.ActivityLevel(rawValue: activityLevel) ?? .moderate,
+            lossPerWeekLbs: weightLossLbsPerWeek
+        )
     }
     
     private var weightBinding: Binding<Double> {
@@ -200,6 +335,38 @@ struct ProfileView: View {
                 }
             }
         )
+    }
+    
+    private var heightFeetBinding: Binding<Int> {
+        Binding(
+            get: {
+                CalorieEstimator.cmToFeetInches(cm: heightCm).feet
+            },
+            set: { newFeet in
+                let currentInches = CalorieEstimator.cmToFeetInches(cm: heightCm).inches
+                heightCm = CalorieEstimator.feetInchesToCm(feet: max(newFeet, 0), inches: currentInches)
+            }
+        )
+    }
+    
+    private var heightInchesBinding: Binding<Double> {
+        Binding(
+            get: {
+                (CalorieEstimator.cmToFeetInches(cm: heightCm).inches * 10).rounded() / 10
+            },
+            set: { newInches in
+                let currentFeet = CalorieEstimator.cmToFeetInches(cm: heightCm).feet
+                heightCm = CalorieEstimator.feetInchesToCm(feet: currentFeet, inches: max(newInches, 0))
+            }
+        )
+    }
+    
+    private var heightConversionLabel: String {
+        if heightUnit == "cm" {
+            let (feet, inches) = CalorieEstimator.cmToFeetInches(cm: heightCm)
+            return String(format: "%d ft %.1f in", feet, inches)
+        }
+        return String(format: "%.1f cm", heightCm)
     }
     
     private var conversionLabel: String {

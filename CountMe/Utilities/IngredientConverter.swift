@@ -10,7 +10,7 @@ import Foundation
 /// Utility functions for converting search results and food items to ingredients
 ///
 /// These conversion utilities enable building custom meals from existing data sources:
-/// - NutritionSearchResult: Foods found via FatSecret API search
+/// - NutritionSearchResult: Foods found via USDA FoodData Central API search
 /// - FoodItem: Previously logged food entries from daily logs
 ///
 /// All conversions preserve nutritional data (calories and macros) and validate
@@ -23,7 +23,7 @@ enum IngredientConverter {
     /// instance suitable for inclusion in a CustomMeal. Serving size and unit information
     /// are preserved, and macro values (protein, carbs, fats) are included if available.
     ///
-    /// - Parameter result: The nutrition search result from FatSecret API
+    /// - Parameter result: The nutrition search result from USDA FoodData Central API
     /// - Returns: An Ingredient instance with all nutritional data preserved
     /// - Throws: `IngredientConversionError.missingRequiredField` if name or calories are invalid
     ///
@@ -81,7 +81,7 @@ enum IngredientConverter {
         }
         
         // Create and return ingredient with all data preserved
-        return Ingredient(
+        return try Ingredient(
             name: result.name,
             quantity: quantity,
             unit: unit,
@@ -154,7 +154,7 @@ enum IngredientConverter {
         }
         
         // Create and return ingredient with all data preserved
-        return Ingredient(
+        return try Ingredient(
             name: foodItem.name,
             quantity: quantity,
             unit: unit,

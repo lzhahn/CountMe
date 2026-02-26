@@ -74,6 +74,13 @@ enum ExerciseIntensity: String, CaseIterable, Identifiable {
 struct ExerciseCalorieEstimator {
     /// Estimates calories burned using MET values
     /// Formula: calories = MET * weight(kg) * duration(hours)
+    ///
+    /// - Parameters:
+    ///   - type: The type of exercise being performed
+    ///   - intensity: The intensity level (light, moderate, vigorous)
+    ///   - weightKg: User's body weight in kilograms
+    ///   - durationMinutes: Duration of exercise in minutes
+    /// - Returns: Estimated calories burned
     static func calories(
         for type: ExerciseType,
         intensity: ExerciseIntensity,
@@ -85,12 +92,27 @@ struct ExerciseCalorieEstimator {
         return met * weightKg * hours
     }
     
+    /// Returns the MET (Metabolic Equivalent of Task) value for a given exercise type and intensity
+    ///
+    /// MET values represent the energy cost of physical activities as multiples of resting metabolic rate.
+    /// Values are calibrated to match real-world calorie burn rates from validated sources like Cronometer.
+    ///
+    /// - Parameters:
+    ///   - type: The type of exercise
+    ///   - intensity: The intensity level
+    /// - Returns: MET value (typically 2.0-12.0)
+    ///
+    /// Example MET values:
+    /// - Light running (4-5 mph): 6.0
+    /// - Moderate running (5-6 mph): 7.0
+    /// - Vigorous running (6.5+ mph): 8.5
     static func metValue(for type: ExerciseType, intensity: ExerciseIntensity) -> Double {
         switch type {
         case .walking:
             return intensity == .light ? 2.8 : (intensity == .moderate ? 3.8 : 5.0)
         case .running:
-            return intensity == .light ? 7.0 : (intensity == .moderate ? 9.8 : 11.5)
+            // Light: jogging ~4-5 mph, Moderate: ~5-6 mph, Vigorous: ~6.5+ mph
+            return intensity == .light ? 6.0 : (intensity == .moderate ? 7.0 : 8.5)
         case .cycling:
             return intensity == .light ? 4.0 : (intensity == .moderate ? 6.8 : 10.0)
         case .strengthTraining:

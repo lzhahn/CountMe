@@ -45,7 +45,7 @@ struct DataStoreCustomMealTests {
         carbohydrates: Double? = 15,
         fats: Double? = 5
     ) -> Ingredient {
-        return Ingredient(
+        return try! Ingredient(
             name: name,
             quantity: quantity,
             unit: unit,
@@ -61,9 +61,9 @@ struct DataStoreCustomMealTests {
         name: String = "Test Meal",
         ingredients: [Ingredient]? = nil,
         lastUsedAt: Date = Date()
-    ) -> CustomMeal {
-        let testIngredients = ingredients ?? [createTestIngredient()]
-        return CustomMeal(
+    ) throws -> CustomMeal {
+        let testIngredients = ingredients ?? [try createTestIngredient()]
+        return try CustomMeal(
             name: name,
             ingredients: testIngredients,
             lastUsedAt: lastUsedAt
@@ -78,7 +78,7 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save a custom meal
-        let meal = createTestMeal(name: "Chicken Stir Fry")
+        let meal = try createTestMeal(name: "Chicken Stir Fry")
         try await dataStore.saveCustomMeal(meal)
         
         // Fetch all meals
@@ -95,7 +95,7 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save a custom meal
-        let meal = createTestMeal(name: "Pasta Carbonara")
+        let meal = try createTestMeal(name: "Pasta Carbonara")
         try await dataStore.saveCustomMeal(meal)
         
         // Fetch by ID
@@ -126,7 +126,7 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save a custom meal
-        let meal = createTestMeal(name: "Original Name")
+        let meal = try createTestMeal(name: "Original Name")
         try await dataStore.saveCustomMeal(meal)
         
         // Update the meal
@@ -146,7 +146,7 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save a custom meal
-        let meal = createTestMeal(name: "To Be Deleted")
+        let meal = try createTestMeal(name: "To Be Deleted")
         try await dataStore.saveCustomMeal(meal)
         
         // Verify it exists
@@ -172,7 +172,7 @@ struct DataStoreCustomMealTests {
             createTestIngredient(name: "Ingredient 2"),
             createTestIngredient(name: "Ingredient 3")
         ]
-        let meal = createTestMeal(name: "Multi-Ingredient Meal", ingredients: ingredients)
+        let meal = try createTestMeal(name: "Multi-Ingredient Meal", ingredients: ingredients)
         try await dataStore.saveCustomMeal(meal)
         
         // Delete the meal
@@ -194,9 +194,9 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save multiple meals
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Chicken Stir Fry"))
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Beef Tacos"))
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Chicken Salad"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Chicken Stir Fry"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Beef Tacos"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Chicken Salad"))
         
         // Search for "chicken" (case-insensitive)
         let results = try await dataStore.searchCustomMeals(query: "chicken")
@@ -212,9 +212,9 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save multiple meals
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Meal 1"))
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Meal 2"))
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Meal 3"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Meal 1"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Meal 2"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Meal 3"))
         
         // Search with empty query
         let results = try await dataStore.searchCustomMeals(query: "")
@@ -228,8 +228,8 @@ struct DataStoreCustomMealTests {
         let dataStore = DataStore(modelContext: container.mainContext)
         
         // Create and save meals
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Chicken Stir Fry"))
-        try await dataStore.saveCustomMeal(createTestMeal(name: "Beef Tacos"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Chicken Stir Fry"))
+        try await dataStore.saveCustomMeal(try createTestMeal(name: "Beef Tacos"))
         
         // Search for something that doesn't exist
         let results = try await dataStore.searchCustomMeals(query: "Pizza")
@@ -246,9 +246,9 @@ struct DataStoreCustomMealTests {
         
         // Create meals with different lastUsedAt timestamps
         let now = Date()
-        let meal1 = createTestMeal(name: "Oldest", lastUsedAt: now.addingTimeInterval(-3600)) // 1 hour ago
-        let meal2 = createTestMeal(name: "Newest", lastUsedAt: now) // now
-        let meal3 = createTestMeal(name: "Middle", lastUsedAt: now.addingTimeInterval(-1800)) // 30 min ago
+        let meal1 = try createTestMeal(name: "Oldest", lastUsedAt: now.addingTimeInterval(-3600)) // 1 hour ago
+        let meal2 = try createTestMeal(name: "Newest", lastUsedAt: now) // now
+        let meal3 = try createTestMeal(name: "Middle", lastUsedAt: now.addingTimeInterval(-1800)) // 30 min ago
         
         // Save in random order
         try await dataStore.saveCustomMeal(meal1)
@@ -271,9 +271,9 @@ struct DataStoreCustomMealTests {
         
         // Create meals with "chicken" in name and different timestamps
         let now = Date()
-        let meal1 = createTestMeal(name: "Chicken Soup", lastUsedAt: now.addingTimeInterval(-7200)) // 2 hours ago
-        let meal2 = createTestMeal(name: "Chicken Salad", lastUsedAt: now) // now
-        let meal3 = createTestMeal(name: "Chicken Tacos", lastUsedAt: now.addingTimeInterval(-3600)) // 1 hour ago
+        let meal1 = try createTestMeal(name: "Chicken Soup", lastUsedAt: now.addingTimeInterval(-7200)) // 2 hours ago
+        let meal2 = try createTestMeal(name: "Chicken Salad", lastUsedAt: now) // now
+        let meal3 = try createTestMeal(name: "Chicken Tacos", lastUsedAt: now.addingTimeInterval(-3600)) // 1 hour ago
         
         try await dataStore.saveCustomMeal(meal1)
         try await dataStore.saveCustomMeal(meal2)

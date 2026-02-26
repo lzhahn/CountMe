@@ -30,8 +30,7 @@ struct ManualEntryViewTests {
         
         let dataStore = DataStore(modelContext: context)
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)
@@ -44,7 +43,7 @@ struct ManualEntryViewTests {
         let tracker = try await createTestTracker()
         
         // Create a food item with all macro fields
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Chicken Breast",
             calories: 165,
             timestamp: Date(),
@@ -75,7 +74,7 @@ struct ManualEntryViewTests {
         let tracker = try await createTestTracker()
         
         // Create a food item without macro fields
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Apple",
             calories: 95,
             timestamp: Date(),
@@ -101,7 +100,7 @@ struct ManualEntryViewTests {
         let tracker = try await createTestTracker()
         
         // Create a food item with only some macro fields
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Banana",
             calories: 105,
             timestamp: Date(),
@@ -179,7 +178,7 @@ struct ManualEntryViewTests {
         let tracker = try await createTestTracker()
         
         // Create a food item with decimal macro values
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Salmon",
             calories: 206,
             timestamp: Date(),
@@ -207,7 +206,7 @@ struct ManualEntryViewTests {
         let tracker = try await createTestTracker()
         
         // Create a food item with zero macro values (valid)
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Sugar",
             calories: 387,
             timestamp: Date(),
@@ -233,7 +232,7 @@ struct ManualEntryViewTests {
         let tracker = try await createTestTracker()
         
         // Create a complete food item with all fields
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Greek Yogurt",
             calories: 97,
             timestamp: Date(),

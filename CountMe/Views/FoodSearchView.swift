@@ -247,6 +247,7 @@ struct FoodSearchView: View {
     private var customMealsContent: some View {
         CustomMealsLibraryContentView(
             manager: customMealManager,
+            apiClient: tracker.nutritionAPIClient,
             searchQuery: $searchQuery
         )
     }
@@ -735,6 +736,9 @@ struct FoodSearchView: View {
 struct CustomMealsLibraryContentView: View {
     /// The custom meal manager business logic
     @Bindable var manager: CustomMealManager
+
+    /// Optional API client for ingredient search in manual entry
+    var apiClient: NutritionAPIClient?
     
     /// Search query text (bound from parent)
     @Binding var searchQuery: String
@@ -745,8 +749,8 @@ struct CustomMealsLibraryContentView: View {
     /// Filtered meals based on search query
     @State private var filteredMeals: [CustomMeal] = []
     
-    /// Controls navigation to recipe input view
-    @State private var showingRecipeInput: Bool = false
+    /// Controls navigation to custom meal method picker
+    @State private var showingMealMethodPicker: Bool = false
     
     /// Meal pending deletion (for confirmation)
     @State private var mealToDelete: CustomMeal?
@@ -799,8 +803,8 @@ struct CustomMealsLibraryContentView: View {
                 updateFilteredMeals()
             }
         }
-        .sheet(isPresented: $showingRecipeInput) {
-            RecipeInputView(manager: manager)
+        .sheet(isPresented: $showingMealMethodPicker) {
+            CustomMealMethodPickerView(manager: manager, apiClient: apiClient)
         }
         .alert("Delete Custom Meal", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) {
@@ -898,14 +902,14 @@ struct CustomMealsLibraryContentView: View {
             Text("No Custom Meals Yet")
                 .font(.headline)
             
-            Text("Create your first custom meal by describing a recipe. Our AI will break it down into ingredients with nutritional information.")
+            Text("Create your first custom meal using AI parsing or manual entry.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
             
             Button {
-                showingRecipeInput = true
+                showingMealMethodPicker = true
             } label: {
                 HStack {
                     Image(systemName: "plus.circle.fill")
@@ -1072,10 +1076,7 @@ struct CustomMealRowCompact: View {
     let dataStore = DataStore(modelContext: context)
     let tracker = CalorieTracker(
         dataStore: dataStore,
-        apiClient: NutritionAPIClient(
-            consumerKey: "preview",
-            consumerSecret: "preview"
-        )
+        apiClient: NutritionAPIClient()
     )
     
     let aiParser = AIRecipeParser()

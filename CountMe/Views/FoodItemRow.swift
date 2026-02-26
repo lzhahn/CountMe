@@ -169,7 +169,7 @@ struct FoodItemRow: View {
 #Preview {
     List {
         FoodItemRow(
-            item: FoodItem(
+            item: try! FoodItem(
                 name: "Chicken Breast",
                 calories: 165,
                 timestamp: Date().addingTimeInterval(-3600),
@@ -185,7 +185,7 @@ struct FoodItemRow: View {
         )
         
         FoodItemRow(
-            item: FoodItem(
+            item: try! FoodItem(
                 name: "Apple",
                 calories: 95,
                 timestamp: Date().addingTimeInterval(-120),
@@ -196,7 +196,7 @@ struct FoodItemRow: View {
         )
         
         FoodItemRow(
-            item: FoodItem(
+            item: try! FoodItem(
                 name: "Chicken Stir Fry",
                 calories: 424,
                 timestamp: Date().addingTimeInterval(-7200),

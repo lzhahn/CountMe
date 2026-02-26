@@ -22,7 +22,7 @@ struct FoodItemMacroTests {
     @Test("FoodItem without macros should work (backward compatibility)")
     func testFoodItemWithoutMacros() async throws {
         // Create a FoodItem without macro parameters (legacy behavior)
-        let item = FoodItem(
+        let item = try FoodItem(
             name: "Apple",
             calories: 95.0,
             source: .manual
@@ -42,7 +42,7 @@ struct FoodItemMacroTests {
     @Test("FoodItem with macros should store values correctly")
     func testFoodItemWithMacros() async throws {
         // Create a FoodItem with macro parameters
-        let item = FoodItem(
+        let item = try FoodItem(
             name: "Chicken Breast",
             calories: 165.0,
             source: .api,
@@ -65,7 +65,7 @@ struct FoodItemMacroTests {
     @Test("FoodItem with partial macros should work")
     func testFoodItemWithPartialMacros() async throws {
         // Create a FoodItem with only some macro parameters
-        let item = FoodItem(
+        let item = try FoodItem(
             name: "Mixed Nuts",
             calories: 200.0,
             source: .manual,
@@ -87,7 +87,7 @@ struct FoodItemMacroTests {
     @Test("FoodItemSource should include customMeal case")
     func testCustomMealSource() async throws {
         // Create a FoodItem with customMeal source
-        let item = FoodItem(
+        let item = try FoodItem(
             name: "Homemade Stir Fry",
             calories: 450.0,
             source: .customMeal,
@@ -109,9 +109,9 @@ struct FoodItemMacroTests {
     
     @Test("FoodItemSource should support all three cases")
     func testAllFoodItemSources() async throws {
-        let apiItem = FoodItem(name: "API Food", calories: 100.0, source: .api)
-        let manualItem = FoodItem(name: "Manual Food", calories: 200.0, source: .manual)
-        let customMealItem = FoodItem(name: "Custom Meal", calories: 300.0, source: .customMeal)
+        let apiItem = try FoodItem(name: "API Food", calories: 100.0, source: .api)
+        let manualItem = try FoodItem(name: "Manual Food", calories: 200.0, source: .manual)
+        let customMealItem = try FoodItem(name: "Custom Meal", calories: 300.0, source: .customMeal)
         
         #expect(apiItem.source == .api)
         #expect(manualItem.source == .manual)
@@ -132,7 +132,7 @@ struct DailyLogMacroTests {
     
     @Test("DailyLog should calculate total protein correctly")
     func testTotalProtein() async throws {
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Chicken",
             calories: 165.0,
             protein: 31.0,
@@ -140,7 +140,7 @@ struct DailyLogMacroTests {
             fats: 3.6
         )
         
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Rice",
             calories: 206.0,
             protein: 4.3,
@@ -148,7 +148,7 @@ struct DailyLogMacroTests {
             fats: 0.4
         )
         
-        let log = DailyLog(
+        let log = try DailyLog(
             date: Date(),
             foodItems: [item1, item2]
         )
@@ -159,7 +159,7 @@ struct DailyLogMacroTests {
     
     @Test("DailyLog should calculate total carbohydrates correctly")
     func testTotalCarbohydrates() async throws {
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Chicken",
             calories: 165.0,
             protein: 31.0,
@@ -167,7 +167,7 @@ struct DailyLogMacroTests {
             fats: 3.6
         )
         
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Rice",
             calories: 206.0,
             protein: 4.3,
@@ -175,7 +175,7 @@ struct DailyLogMacroTests {
             fats: 0.4
         )
         
-        let log = DailyLog(
+        let log = try DailyLog(
             date: Date(),
             foodItems: [item1, item2]
         )
@@ -186,7 +186,7 @@ struct DailyLogMacroTests {
     
     @Test("DailyLog should calculate total fats correctly")
     func testTotalFats() async throws {
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Chicken",
             calories: 165.0,
             protein: 31.0,
@@ -194,7 +194,7 @@ struct DailyLogMacroTests {
             fats: 3.6
         )
         
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Rice",
             calories: 206.0,
             protein: 4.3,
@@ -202,7 +202,7 @@ struct DailyLogMacroTests {
             fats: 0.4
         )
         
-        let log = DailyLog(
+        let log = try DailyLog(
             date: Date(),
             foodItems: [item1, item2]
         )
@@ -214,7 +214,7 @@ struct DailyLogMacroTests {
     @Test("DailyLog should treat nil macro values as zero")
     func testNilMacroValuesAsZero() async throws {
         // Item with macros
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Chicken",
             calories: 165.0,
             protein: 31.0,
@@ -223,14 +223,14 @@ struct DailyLogMacroTests {
         )
         
         // Item without macros (legacy)
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Apple",
             calories: 95.0,
             source: .manual
             // No macro values - all nil
         )
         
-        let log = DailyLog(
+        let log = try DailyLog(
             date: Date(),
             foodItems: [item1, item2]
         )
@@ -243,7 +243,7 @@ struct DailyLogMacroTests {
     
     @Test("DailyLog with no food items should have zero macro totals")
     func testEmptyLogMacroTotals() async throws {
-        let log = DailyLog(
+        let log = try DailyLog(
             date: Date(),
             foodItems: []
         )
@@ -257,7 +257,7 @@ struct DailyLogMacroTests {
     @Test("DailyLog should handle mixed nil and non-nil macro values")
     func testMixedNilAndNonNilMacros() async throws {
         // Item with all macros
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Chicken",
             calories: 165.0,
             protein: 31.0,
@@ -266,7 +266,7 @@ struct DailyLogMacroTests {
         )
         
         // Item with partial macros
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Nuts",
             calories: 200.0,
             protein: 6.0,
@@ -275,13 +275,13 @@ struct DailyLogMacroTests {
         )
         
         // Item with no macros
-        let item3 = FoodItem(
+        let item3 = try FoodItem(
             name: "Apple",
             calories: 95.0,
             source: .manual
         )
         
-        let log = DailyLog(
+        let log = try DailyLog(
             date: Date(),
             foodItems: [item1, item2, item3]
         )

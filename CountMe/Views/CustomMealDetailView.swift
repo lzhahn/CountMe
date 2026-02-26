@@ -34,8 +34,8 @@ struct CustomMealDetailView: View {
     /// Optional callback to dismiss the entire sheet stack
     var onDismissAll: (() -> Void)? = nil
     
-    /// SwiftData model context for fetching/creating daily logs
-    @Environment(\.modelContext) private var modelContext
+    /// Shared data store from environment
+    @Environment(\.dataStore) private var envDataStore
     
     /// Controls dismissal of this view
     @Environment(\.dismiss) private var dismiss
@@ -749,15 +749,18 @@ struct CustomMealDetailView: View {
     private func addToToday() {
         Task {
             do {
-                // Get or create today's daily log
-                let today = Date()
-                let dataStore = DataStore(modelContext: modelContext)
+                guard let dataStore = envDataStore else {
+                    manager.errorMessage = "Unable to access data store"
+                    return
+                }
                 
+                // Get or create today's daily log using the SHARED DataStore
+                let today = Date()
                 var todayLog = try await dataStore.fetchDailyLog(for: today)
                 
                 if todayLog == nil {
                     // Create a new daily log for today
-                    todayLog = DailyLog(date: today)
+                    todayLog = try DailyLog(date: today)
                     try await dataStore.saveDailyLog(todayLog!)
                 }
                 
@@ -837,12 +840,12 @@ struct CustomMealDetailView: View {
     let aiParser = AIRecipeParser()
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     
-    let sampleMeal = CustomMeal(
+    let sampleMeal = try! CustomMeal(
         name: "Chicken Stir Fry",
         ingredients: [
-            Ingredient(name: "Chicken Breast", quantity: 6, unit: "oz", calories: 187, protein: 35, carbohydrates: 0, fats: 4),
-            Ingredient(name: "White Rice", quantity: 1, unit: "cup", calories: 206, protein: 4, carbohydrates: 45, fats: 0.4),
-            Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
+            try! Ingredient(name: "Chicken Breast", quantity: 6, unit: "oz", calories: 187, protein: 35, carbohydrates: 0, fats: 4),
+            try! Ingredient(name: "White Rice", quantity: 1, unit: "cup", calories: 206, protein: 4, carbohydrates: 45, fats: 0.4),
+            try! Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
         ],
         createdAt: Date().addingTimeInterval(-86400 * 7),
         lastUsedAt: Date().addingTimeInterval(-3600)

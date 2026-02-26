@@ -32,11 +32,24 @@ class CalorieTracker {
     private let apiClient: NutritionAPIClient
     private var syncEngine: FirebaseSyncEngine?
     private var userId: String?
+
+    /// Public accessor for the nutrition API client
+    var nutritionAPIClient: NutritionAPIClient { apiClient }
     
     // MARK: - Published State
     
     /// The currently loaded daily log
     var currentLog: DailyLog?
+    
+    /// Cached array of food items to trigger SwiftUI updates
+    /// This is necessary because SwiftUI doesn't always observe changes
+    /// to SwiftData @Relationship arrays inside @Observable classes
+    var foodItemsCache: [FoodItem] = []
+    
+    /// Cached array of exercise items to trigger SwiftUI updates
+    /// This is necessary because SwiftUI doesn't always observe changes
+    /// to SwiftData @Relationship arrays inside @Observable classes
+    var exerciseItemsCache: [ExerciseItem] = []
     
     /// The date for which the current log is loaded
     var selectedDate: Date
@@ -109,25 +122,52 @@ class CalorieTracker {
     func loadLog(for date: Date) async throws {
         isLoading = true
         errorMessage = nil
-        selectedDate = date
         
-        print("📅 Loading log for date: \(date)")
+        // Normalize date to midnight local time before any operations
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        selectedDate = normalizedDate
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        print("📅 Loading log for date: \(formatter.string(from: normalizedDate))")
         
         do {
             // Try to fetch existing log
-            if let existingLog = try await dataStore.fetchDailyLog(for: date) {
-                print("✅ Found existing log with \(existingLog.foodItems.count) food items")
+            if let existingLog = try await dataStore.fetchDailyLog(for: normalizedDate) {
+                // Force SwiftData to load the relationships by accessing them
+                let foodCount = existingLog.foodItems.count
+                let exerciseCount = existingLog.exerciseItems.count
+                print("✅ Found existing log with \(foodCount) food items, \(exerciseCount) exercise items")
+                
+                // Debug: Print exercise item details
+                for (index, exercise) in existingLog.exerciseItems.enumerated() {
+                    print("  Exercise \(index + 1): \(exercise.name) - \(exercise.caloriesBurned) cal")
+                }
+                
                 currentLog = existingLog
+                // Update caches to trigger SwiftUI observation
+                foodItemsCache = existingLog.foodItems
+                exerciseItemsCache = existingLog.exerciseItems
+                
+                print("📦 Cache updated: \(foodItemsCache.count) food items, \(exerciseItemsCache.count) exercise items")
             } else {
                 // Create new log for this date
                 print("➕ Creating new log for date")
-                let newLog = DailyLog(date: date)
-                try await dataStore.saveDailyLog(newLog)
-                currentLog = newLog
+                do {
+                    let newLog = try DailyLog(date: normalizedDate)
+                    try await dataStore.saveDailyLog(newLog)
+                    currentLog = newLog
+                    foodItemsCache = []
+                    exerciseItemsCache = []
+                } catch let error as ValidationError {
+                    print("❌ Validation error creating daily log: \(error.localizedDescription)")
+                    throw error
+                }
             }
             
             // Update last checked date to the normalized date
-            lastCheckedDate = Calendar.current.startOfDay(for: date)
+            lastCheckedDate = normalizedDate
             
             isLoading = false
         } catch {
@@ -211,9 +251,16 @@ class CalorieTracker {
             }
             
             // Force UI update by reloading the log
+            // Store the current log ID to verify we're reloading the same log
+            let currentLogId = log.id
             try await loadLog(for: selectedDate)
             
-            print("🔄 Triggered UI update by reloading log")
+            // Verify the reload worked
+            if let reloadedLog = currentLog {
+                print("🔄 Reloaded log \(currentLogId), now has \(reloadedLog.foodItems.count) items")
+            } else {
+                print("⚠️ Failed to reload log after adding food item")
+            }
         } catch let error as SyncError {
             // Handle sync errors gracefully - local data is already saved
             print("⚠️ Sync error while adding food item: \(error.localizedDescription)")
@@ -324,29 +371,52 @@ class CalorieTracker {
             throw CalorieTrackerError.noCurrentLog
         }
         
+        print("🏃 Adding exercise item: \(item.name) with \(item.caloriesBurned) calories burned")
+        print("📋 Current log has \(log.exerciseItems.count) exercise items before adding")
+        
         errorMessage = nil
         
         do {
             item.dailyLog = log
             log.exerciseItems.append(item)
             
+            print("📋 Current log now has \(log.exerciseItems.count) exercise items after appending")
+            
             try await dataStore.saveDailyLog(log)
             
+            print("✅ Successfully saved daily log with exercise item to database")
+            
             if let syncEngine = syncEngine, let userId = userId {
+                print("🔍 DEBUG: Syncing exercise with userId: \(userId)")
+                print("🔍 DEBUG: Exercise item id: \(item.id)")
+                
                 item.userId = userId
                 item.lastModified = Date()
                 item.syncStatus = .pendingUpload
+                
+                print("🔍 DEBUG: Exercise item userId set to: \(item.userId)")
                 
                 try await syncEngine.syncExerciseItem(item, userId: userId)
                 
                 log.userId = userId
                 log.lastModified = Date()
                 try await syncEngine.syncDailyLog(log, userId: userId)
+                
+                print("☁️ Synced exercise item to cloud")
             }
             
             // Force UI update by reloading the log
+            let currentLogId = log.id
             try await loadLog(for: selectedDate)
+            
+            // Verify the reload worked
+            if let reloadedLog = currentLog {
+                print("🔄 Reloaded log \(currentLogId), now has \(reloadedLog.exerciseItems.count) exercise items")
+            } else {
+                print("⚠️ Failed to reload log after adding exercise item")
+            }
         } catch {
+            print("❌ Error adding exercise item: \(error)")
             errorMessage = "Failed to add exercise item: \(error.localizedDescription)"
             throw error
         }

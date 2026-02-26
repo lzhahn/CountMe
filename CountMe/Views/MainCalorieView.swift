@@ -37,14 +37,19 @@ struct MainCalorieView: View {
     /// Controls navigation to food search view
     @State private var showingFoodSearch = false
     
-    /// Controls navigation to goal setting view
-    @State private var showingGoalSetting = false
+    // Profile values for auto-goal calculation
+    @AppStorage("exerciseBodyWeightKg") private var bodyWeightKg: Double = 70
+    @AppStorage("weightLossLbsPerWeek") private var weightLossLbsPerWeek: Double = 1.0
+    @AppStorage("userHeightCm") private var heightCm: Double = 170
+    @AppStorage("userAge") private var age: Int = 30
+    @AppStorage("userSex") private var sex: String = "male"
+    @AppStorage("userActivityLevel") private var activityLevel: String = "moderate"
     
     /// Controls navigation to custom meals library
     @State private var showingCustomMeals = false
     
-    /// Controls navigation to recipe input (AI meal creation)
-    @State private var showingRecipeInput = false
+    /// Controls navigation to custom meal method picker (AI or manual)
+    @State private var showingMealMethodPicker = false
     
     /// The saved meal to show in detail view
     @State private var savedMealToShow: CustomMeal?
@@ -57,6 +62,9 @@ struct MainCalorieView: View {
     
     /// The exercise item currently being edited
     @State private var editingExerciseItem: ExerciseItem?
+    
+    /// Selected segment for food/exercise toggle
+    @State private var selectedSegment: LogSegment = .food
     
     /// Controls the add menu visibility
     @State private var showingAddMenu = false
@@ -119,39 +127,32 @@ struct MainCalorieView: View {
                     floatingActionButton
                 }
             }
-            .navigationTitle("Today")
+            .navigationTitle(navigationTitle)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingGoalSetting = true
-                    } label: {
-                        Image(systemName: "target")
-                            .font(.title3)
-                    }
-                    .disabled(isSelectionMode)
+                    dateNavigationButtons
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if isSelectionMode {
-                        Button("Cancel") {
-                            exitSelectionMode()
+                    if selectedSegment == .food {
+                        if isSelectionMode {
+                            Button("Cancel") {
+                                exitSelectionMode()
+                            }
+                        } else {
+                            Button {
+                                enterSelectionMode()
+                            } label: {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.title3)
+                            }
+                            .disabled(tracker.currentLog?.foodItems.isEmpty ?? true)
                         }
-                    } else {
-                        Button {
-                            enterSelectionMode()
-                        } label: {
-                            Image(systemName: "checkmark.circle")
-                                .font(.title3)
-                        }
-                        .disabled(tracker.currentLog?.foodItems.isEmpty ?? true)
                     }
                 }
             }
             .sheet(isPresented: $showingFoodSearch) {
                 FoodSearchView(tracker: tracker, customMealManager: customMealManager)
-            }
-            .sheet(isPresented: $showingGoalSetting) {
-                GoalSettingView(tracker: tracker)
             }
             .sheet(isPresented: $showingCustomMeals) {
                 CustomMealsLibraryView(
@@ -159,14 +160,19 @@ struct MainCalorieView: View {
                     onDismissAll: {
                         // Dismiss the entire custom meals sheet
                         showingCustomMeals = false
+                        // Reload the daily log so the new food item shows up
+                        Task {
+                            try? await tracker.loadLog(for: tracker.selectedDate)
+                        }
                     }
                 )
             }
-            .sheet(isPresented: $showingRecipeInput) {
-                RecipeInputView(
+            .sheet(isPresented: $showingMealMethodPicker) {
+                CustomMealMethodPickerView(
                     manager: customMealManager,
+                    apiClient: tracker.nutritionAPIClient,
                     onDismiss: { savedMeal in
-                        showingRecipeInput = false
+                        showingMealMethodPicker = false
                         // Show the saved meal detail after a brief delay
                         if let meal = savedMeal {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -184,6 +190,10 @@ struct MainCalorieView: View {
                         onDismissAll: {
                             // Dismiss the sheet
                             savedMealToShow = nil
+                            // Reload the daily log so the new food item shows up
+                            Task {
+                                try? await tracker.loadLog(for: tracker.selectedDate)
+                            }
                         }
                     )
                 }
@@ -221,6 +231,15 @@ struct MainCalorieView: View {
                 message: toastMessage,
                 style: toastStyle
             )
+            .onAppear {
+                applyAutoGoalIfNeeded()
+            }
+            .onChange(of: tracker.currentLog?.id) {
+                applyAutoGoalIfNeeded()
+            }
+            .onChange(of: suggestedGoal) {
+                applyAutoGoalIfNeeded()
+            }
         }
     }
     
@@ -241,20 +260,20 @@ struct MainCalorieView: View {
                         showingFoodSearch = true
                     }
                     
-                    // AI Meal option
+                    // Custom Meal option
                     FloatingMenuButton(
-                        icon: "sparkles",
-                        title: "AI Meal",
+                        icon: "fork.knife.circle",
+                        title: "Custom Meal",
                         color: .orange
                     ) {
                         showingAddMenu = false
-                        showingRecipeInput = true
+                        showingMealMethodPicker = true
                     }
                     
                     // Manual entry option
                     FloatingMenuButton(
                         icon: "pencil.circle",
-                        title: "Manual Entry",
+                        title: "Quick Add",
                         color: .green
                     ) {
                         showingAddMenu = false
@@ -401,7 +420,7 @@ struct MainCalorieView: View {
         }
     }
     
-    /// Combined list of food and exercise items for today
+    /// Combined list of food and exercise items for today with segment picker
     private var combinedItemsList: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -433,117 +452,175 @@ struct MainCalorieView: View {
                 }
             }
             
-            List {
-                Section("Food") {
-                    if let items = tracker.currentLog?.foodItems, !items.isEmpty {
-                        let _ = print("🍽️ Displaying \(items.count) food items in list")
-                        ForEach(items, id: \.id) { item in
-                            HStack(spacing: 12) {
-                                if isSelectionMode {
-                                    Button {
-                                        toggleSelection(for: item)
-                                    } label: {
-                                        Image(systemName: selectedItems.contains(item.id) ? "checkmark.circle.fill" : "circle")
-                                            .font(.title3)
-                                            .foregroundColor(selectedItems.contains(item.id) ? .blue : .gray)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                
-                                FoodItemRow(
-                                    item: item,
-                                    onDelete: {
-                                        Task {
-                                            try? await tracker.removeFoodItem(item)
-                                        }
-                                    },
-                                    onEdit: {
-                                        editingItem = item
-                                    },
-                                    isSelectionMode: isSelectionMode
-                                )
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                if !isSelectionMode {
-                                    Button(role: .destructive) {
-                                        Task {
-                                            try? await tracker.removeFoodItem(item)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
-                            .contextMenu {
-                                if !isSelectionMode {
-                                    Button {
-                                        editingItem = item
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    
-                                    Button(role: .destructive) {
-                                        Task {
-                                            try? await tracker.removeFoodItem(item)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        emptyFoodState
-                    }
+            Picker("Log Type", selection: $selectedSegment) {
+                ForEach(LogSegment.allCases, id: \.self) { segment in
+                    Text(segment.rawValue).tag(segment)
                 }
-                
-                Section("Exercise") {
-                    if let items = tracker.currentLog?.exerciseItems, !items.isEmpty {
-                        ForEach(items.sorted { $0.timestamp > $1.timestamp }, id: \.id) { item in
-                            ExerciseItemRow(
+            }
+            .pickerStyle(.segmented)
+            
+            switch selectedSegment {
+            case .food:
+                foodItemsList
+            case .exercise:
+                exerciseItemsList
+            }
+        }
+    }
+    
+    /// Food items list section
+    private var foodItemsList: some View {
+        Group {
+            // Use the cached array from tracker instead of accessing the relationship directly
+            // This ensures SwiftUI properly observes changes
+            if !tracker.foodItemsCache.isEmpty {
+                let _ = print("🍽️ Displaying \(tracker.foodItemsCache.count) food items in list")
+                List {
+                    ForEach(tracker.foodItemsCache, id: \.id) { item in
+                        HStack(spacing: 12) {
+                            if isSelectionMode {
+                                Button {
+                                    toggleSelection(for: item)
+                                } label: {
+                                    Image(systemName: selectedItems.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.title3)
+                                        .foregroundColor(selectedItems.contains(item.id) ? .blue : .gray)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            
+                            FoodItemRow(
                                 item: item,
                                 onDelete: {
                                     Task {
-                                        try? await tracker.removeExerciseItem(item)
+                                        try? await tracker.removeFoodItem(item)
                                     }
                                 },
                                 onEdit: {
-                                    editingExerciseItem = item
-                                }
+                                    editingItem = item
+                                },
+                                isSelectionMode: isSelectionMode
                             )
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if !isSelectionMode {
                                 Button(role: .destructive) {
                                     Task {
-                                        try? await tracker.removeExerciseItem(item)
+                                        try? await tracker.removeFoodItem(item)
                                     }
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
-                            .contextMenu {
+                        }
+                        .contextMenu {
+                            if !isSelectionMode {
                                 Button {
-                                    editingExerciseItem = item
+                                    editingItem = item
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
                                 
                                 Button(role: .destructive) {
                                     Task {
-                                        try? await tracker.removeExerciseItem(item)
+                                        try? await tracker.removeFoodItem(item)
                                     }
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
                         }
-                    } else {
-                        emptyExerciseState
                     }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 260, maxHeight: 520)
+            } else {
+                emptyFoodState
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .frame(minHeight: 260, maxHeight: 520)
+        }
+    }
+    
+    /// Exercise items list section
+    private var exerciseItemsList: some View {
+        Group {
+            // Exercise summary
+            if !tracker.exerciseItemsCache.isEmpty {
+                VStack(spacing: 8) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Total Burned")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(Int(tracker.currentLog?.totalExerciseCalories ?? 0)) kcal")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                        }
+                        
+                        Spacer()
+                        
+                        let totalMinutes = tracker.exerciseItemsCache.reduce(0.0) { $0 + ($1.durationMinutes ?? 0) }
+                        if totalMinutes > 0 {
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("Duration")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(Int(totalMinutes)) min")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                List {
+                    ForEach(tracker.exerciseItemsCache.sorted { $0.timestamp > $1.timestamp }, id: \.id) { item in
+                        ExerciseItemRow(
+                            item: item,
+                            onDelete: {
+                                Task {
+                                    try? await tracker.removeExerciseItem(item)
+                                }
+                            },
+                            onEdit: {
+                                editingExerciseItem = item
+                            }
+                        )
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Task {
+                                    try? await tracker.removeExerciseItem(item)
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                editingExerciseItem = item
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            
+                            Button(role: .destructive) {
+                                Task {
+                                    try? await tracker.removeExerciseItem(item)
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 200, maxHeight: 520)
+            } else {
+                emptyExerciseState
+            }
         }
     }
     
@@ -580,6 +657,42 @@ struct MainCalorieView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
+    }
+    
+    /// Date navigation buttons for previous/next day
+    private var dateNavigationButtons: some View {
+        HStack(spacing: 8) {
+            Button {
+                changeDate(by: -1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body)
+            }
+            
+            DatePicker(
+                "",
+                selection: Binding(
+                    get: { tracker.selectedDate },
+                    set: { newDate in
+                        Task {
+                            try? await tracker.loadLog(for: newDate)
+                        }
+                    }
+                ),
+                in: ...Date(),
+                displayedComponents: .date
+            )
+            .labelsHidden()
+            .fixedSize()
+            
+            Button {
+                changeDate(by: 1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.body)
+            }
+            .disabled(Calendar.current.isDateInToday(tracker.selectedDate))
+        }
     }
     
     /// Error state view with retry button
@@ -628,6 +741,43 @@ struct MainCalorieView: View {
     
     // MARK: - Computed Properties
     
+    /// Navigation title showing the current date
+    private var navigationTitle: String {
+        if Calendar.current.isDateInToday(tracker.selectedDate) {
+            return "Today"
+        } else if Calendar.current.isDateInYesterday(tracker.selectedDate) {
+            return "Yesterday"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return formatter.string(from: tracker.selectedDate)
+        }
+    }
+    
+    /// Suggested daily calorie goal based on profile settings
+    private var suggestedGoal: Double {
+        CalorieEstimator.suggestedCalories(
+            weightKg: bodyWeightKg,
+            heightCm: heightCm,
+            age: age,
+            sex: CalorieEstimator.Sex(rawValue: sex) ?? .male,
+            activity: CalorieEstimator.ActivityLevel(rawValue: activityLevel) ?? .moderate,
+            lossPerWeekLbs: weightLossLbsPerWeek
+        )
+    }
+    
+    /// Automatically sets the daily goal from profile settings
+    private func applyAutoGoalIfNeeded() {
+        guard tracker.currentLog != nil else { return }
+        let goal = suggestedGoal
+        guard goal > 0 else { return }
+        // Skip if already matching to avoid unnecessary saves
+        if tracker.currentLog?.dailyGoal == goal { return }
+        Task {
+            try? await tracker.setDailyGoal(goal)
+        }
+    }
+    
     /// Current daily total calories
     private var currentTotal: Double {
         tracker.getNetCalories()
@@ -675,6 +825,22 @@ struct MainCalorieView: View {
     
     // MARK: - Selection Mode Methods
     
+    /// Changes the selected date by the specified number of days
+    private func changeDate(by days: Int) {
+        guard let newDate = Calendar.current.date(byAdding: .day, value: days, to: tracker.selectedDate) else {
+            return
+        }
+        
+        // Don't allow navigating to future dates
+        if newDate > Date() {
+            return
+        }
+        
+        Task {
+            try? await tracker.loadLog(for: newDate)
+        }
+    }
+    
     /// Enter multi-select mode for creating meals from food items
     private func enterSelectionMode() {
         isSelectionMode = true
@@ -706,15 +872,26 @@ struct MainCalorieView: View {
     /// **Validates: Requirements 13.5 (Manual Retry)**
     private func performManualSync() async {
         guard let syncEngine = syncEngine, let userId = userId else {
-            // No sync engine configured - skip sync
+            // No sync engine configured - just reload local data
+            do {
+                try await tracker.loadLog(for: tracker.selectedDate)
+            } catch {
+                print("⚠️ Failed to reload local log: \(error)")
+            }
             return
         }
         
         isSyncing = true
         
         do {
-            // Trigger manual sync
+            // Push pending local changes
             try await syncEngine.forceSyncNow()
+            
+            // Pull remote data from Firebase into local store
+            try await syncEngine.downloadFromFirestore(userId: userId)
+            
+            // Reload the tracker's daily log so the UI reflects the latest data
+            try await tracker.loadLog(for: tracker.selectedDate)
             
             // Show success toast
             await MainActor.run {
@@ -763,6 +940,12 @@ struct MainCalorieView: View {
 
 // MARK: - Floating Menu Button Component
 
+/// Segment options for the food/exercise toggle on the main calorie view
+enum LogSegment: String, CaseIterable {
+    case food = "Food"
+    case exercise = "Exercise"
+}
+
 /// Individual button in the floating action menu
 struct FloatingMenuButton: View {
     let icon: String
@@ -806,10 +989,7 @@ struct FloatingMenuButton: View {
     let dataStore = DataStore(modelContext: context)
     let tracker = CalorieTracker(
         dataStore: dataStore,
-        apiClient: NutritionAPIClient(
-            consumerKey: "preview",
-            consumerSecret: "preview"
-        )
+        apiClient: NutritionAPIClient()
     )
     
     let aiParser = AIRecipeParser()

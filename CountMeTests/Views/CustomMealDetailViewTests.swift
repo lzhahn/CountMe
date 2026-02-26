@@ -35,10 +35,10 @@ struct CustomMealDetailViewTests {
     
     /// Creates a sample custom meal for testing
     private func createSampleMeal() -> CustomMeal {
-        return CustomMeal(
+        return try! CustomMeal(
             name: "Test Meal",
             ingredients: [
-                Ingredient(
+                try! Ingredient(
                     name: "Chicken",
                     quantity: 6,
                     unit: "oz",
@@ -47,7 +47,7 @@ struct CustomMealDetailViewTests {
                     carbohydrates: 0,
                     fats: 5
                 ),
-                Ingredient(
+                try! Ingredient(
                     name: "Rice",
                     quantity: 1,
                     unit: "cup",
@@ -134,7 +134,7 @@ struct CustomMealDetailViewTests {
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
-        let log = DailyLog(date: Date())
+        let log = try DailyLog(date: Date())
         
         // Add meal to log (must be on main actor)
         @MainActor func addMeal() async throws -> [FoodItem] {
@@ -162,7 +162,7 @@ struct CustomMealDetailViewTests {
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
-        let log = DailyLog(date: Date())
+        let log = try DailyLog(date: Date())
         let multiplier = 2.0
         
         // Add meal to log with multiplier (must be on main actor)
@@ -192,7 +192,7 @@ struct CustomMealDetailViewTests {
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
-        let log = DailyLog(date: Date())
+        let log = try DailyLog(date: Date())
         
         // Add meal to log (must be on main actor)
         @MainActor func addMeal() async throws -> [FoodItem] {
@@ -221,7 +221,7 @@ struct CustomMealDetailViewTests {
         
         let meal = createSampleMeal()
         let originalLastUsedAt = meal.lastUsedAt
-        let log = DailyLog(date: Date())
+        let log = try DailyLog(date: Date())
         
         // Wait a moment to ensure timestamp difference (reduced from 100ms to 1ms)
         try await Task.sleep(nanoseconds: 1_000_000) // 0.001 seconds
@@ -250,7 +250,7 @@ struct CustomMealDetailViewTests {
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
-        let log = DailyLog(date: Date())
+        let log = try DailyLog(date: Date())
         
         // Attempt to add meal with zero multiplier (must be on main actor)
         @MainActor func addMeal() async throws {
@@ -283,7 +283,7 @@ struct CustomMealDetailViewTests {
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
-        let log = DailyLog(date: Date())
+        let log = try DailyLog(date: Date())
         
         // Attempt to add meal with negative multiplier (must be on main actor)
         @MainActor func addMeal() async throws {
@@ -342,10 +342,10 @@ struct CustomMealDetailViewTests {
     
     @Test("Meal with no macros displays correctly")
     func testMealWithNoMacrosDisplaysCorrectly() async throws {
-        let mealWithoutMacros = CustomMeal(
+        let mealWithoutMacros = try! CustomMeal(
             name: "Simple Meal",
             ingredients: [
-                Ingredient(
+                try! Ingredient(
                     name: "Food Item",
                     quantity: 1,
                     unit: "serving",
@@ -366,10 +366,10 @@ struct CustomMealDetailViewTests {
     
     @Test("Meal with partial macros displays correctly")
     func testMealWithPartialMacrosDisplaysCorrectly() async throws {
-        let mealWithPartialMacros = CustomMeal(
+        let mealWithPartialMacros = try! CustomMeal(
             name: "Partial Macros Meal",
             ingredients: [
-                Ingredient(
+                try! Ingredient(
                     name: "Food Item 1",
                     quantity: 1,
                     unit: "serving",
@@ -377,7 +377,7 @@ struct CustomMealDetailViewTests {
                     protein: 10
                     // No carbs or fats
                 ),
-                Ingredient(
+                try! Ingredient(
                     name: "Food Item 2",
                     quantity: 1,
                     unit: "serving",

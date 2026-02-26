@@ -230,21 +230,31 @@ struct ExerciseEntryView: View {
                 }
             }
         } else {
-            let newItem = ExerciseItem(
-                name: name,
-                caloriesBurned: calories,
-                durationMinutes: minutes,
-                exerciseType: selectedType,
-                intensity: selectedIntensity,
-                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            
-            Task {
-                try? await tracker.addExerciseItem(newItem)
-                await MainActor.run {
-                    isSaving = false
-                    dismiss()
+            do {
+                let newItem = try ExerciseItem(
+                    name: name,
+                    caloriesBurned: calories,
+                    durationMinutes: minutes,
+                    exerciseType: selectedType,
+                    intensity: selectedIntensity,
+                    notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+                
+                Task {
+                    try? await tracker.addExerciseItem(newItem)
+                    await MainActor.run {
+                        isSaving = false
+                        dismiss()
+                    }
                 }
+            } catch let error as ValidationError {
+                // Handle validation error synchronously
+                isSaving = false
+                validationError = error.localizedDescription
+            } catch {
+                // Validation error - should not happen with UI constraints
+                print("Failed to create exercise item: \(error)")
+                isSaving = false
             }
         }
     }

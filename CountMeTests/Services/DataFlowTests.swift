@@ -27,8 +27,7 @@ struct DataFlowTests {
         // Create dependencies
         let dataStore = DataStore(modelContext: context)
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         // Create tracker
@@ -47,7 +46,7 @@ struct DataFlowTests {
         print("📊 Initial food items count: \(initialCount)")
         
         // Create a food item
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Test Apple",
             calories: 95,
             timestamp: Date(),
@@ -87,8 +86,7 @@ struct DataFlowTests {
         // Create dependencies
         let dataStore = DataStore(modelContext: context)
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         // Create tracker
@@ -102,7 +100,7 @@ struct DataFlowTests {
         try await tracker.loadLog(for: Date())
         
         // Add a food item
-        let foodItem = FoodItem(
+        let foodItem = try FoodItem(
             name: "Test Banana",
             calories: 105,
             timestamp: Date(),
@@ -137,8 +135,7 @@ struct DataFlowTests {
         // Create dependencies
         let dataStore = DataStore(modelContext: context)
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         // Create tracker
@@ -153,9 +150,9 @@ struct DataFlowTests {
         
         // Add multiple food items
         let items = [
-            FoodItem(name: "Apple", calories: 95, timestamp: Date(), source: .manual),
-            FoodItem(name: "Banana", calories: 105, timestamp: Date(), source: .manual),
-            FoodItem(name: "Orange", calories: 62, timestamp: Date(), source: .manual)
+            try FoodItem(name: "Apple", calories: 95, timestamp: Date(), source: .manual),
+            try FoodItem(name: "Banana", calories: 105, timestamp: Date(), source: .manual),
+            try FoodItem(name: "Orange", calories: 62, timestamp: Date(), source: .manual)
         ]
         
         for item in items {

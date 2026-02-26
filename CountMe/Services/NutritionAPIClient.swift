@@ -2,7 +2,7 @@
 //  NutritionAPIClient.swift
 //  CountMe
 //
-//  Actor for interacting with the FatSecret Platform API
+//  Actor for interacting with the OpenFoodFacts API
 //
 
 import Foundation
@@ -32,29 +32,23 @@ enum NutritionAPIError: Error, LocalizedError {
     }
 }
 
-/// Actor for thread-safe nutrition API operations
+/// Actor for thread-safe nutrition API operations using OpenFoodFacts
 actor NutritionAPIClient {
     private let session: URLSession
-    private let consumerKey: String
-    private let consumerSecret: String
-    private let signatureGenerator: OAuth1SignatureGenerator
+    private let userAgent: String
     
-    private let baseURL = "https://platform.fatsecret.com/rest/server.api"
+    private let baseURL = "https://world.openfoodfacts.org"
     
     /// Initializes the nutrition API client
     /// - Parameters:
-    ///   - consumerKey: FatSecret API consumer key
-    ///   - consumerSecret: FatSecret API consumer secret
+    ///   - userAgent: User-Agent string for API requests (required by OpenFoodFacts)
     ///   - session: URLSession for network requests (defaults to configured session with 30s timeout)
     init(
-        consumerKey: String,
-        consumerSecret: String,
+        userAgent: String = "CountMe/1.0 (iOS calorie tracker)",
         session: URLSession? = nil
     ) {
-        self.consumerKey = consumerKey
-        self.consumerSecret = consumerSecret
+        self.userAgent = userAgent
         
-        // Configure session with 30-second timeout if not provided
         if let session = session {
             self.session = session
         } else {
@@ -63,128 +57,152 @@ actor NutritionAPIClient {
             configuration.timeoutIntervalForResource = 30.0
             self.session = URLSession(configuration: configuration)
         }
-        
-        self.signatureGenerator = OAuth1SignatureGenerator(
-            consumerKey: consumerKey,
-            consumerSecret: consumerSecret
-        )
     }
     
-    /// Searches for food items by name
-    /// - Parameter query: The search query string
-    /// - Returns: Array of nutrition search results
+    /// Searches for food items by name using OpenFoodFacts
+    ///
+    /// Sends the query to the OpenFoodFacts API and returns matching products.
+    /// OpenFoodFacts is a global, community-driven food database with barcode support.
+    ///
+    /// - Parameter query: The search query string (e.g., "trader joes yogurt")
+    /// - Returns: Array of nutrition search results sorted by relevance (max 25)
     /// - Throws: NutritionAPIError if the request fails
     func searchFood(query: String) async throws -> [NutritionSearchResult] {
-        // Generate OAuth signature with all parameters
-        let signatureResult = signatureGenerator.generateSignature(
-            httpMethod: "GET",
-            url: baseURL,
-            parameters: [
-                "method": "foods.search",
-                "search_expression": query,
-                "format": "json"
-            ]
-        )
+        let searchURL = "\(baseURL)/cgi/search.pl"
         
-        // Build request parameters with OAuth credentials
-        var parameters: [String: String] = [
-            "method": "foods.search",
-            "search_expression": query,
-            "format": "json",
-            "oauth_consumer_key": consumerKey,
-            "oauth_signature_method": "HMAC-SHA1",
-            "oauth_timestamp": signatureResult.timestamp,
-            "oauth_nonce": signatureResult.nonce,
-            "oauth_version": "1.0",
-            "oauth_signature": signatureResult.signature
-        ]
-        
-        // Build URL with query parameters
-        guard var urlComponents = URLComponents(string: baseURL) else {
+        guard var urlComponents = URLComponents(string: searchURL) else {
             throw NutritionAPIError.invalidResponse
         }
         
-        urlComponents.queryItems = parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
+        // OpenFoodFacts search parameters
+        let queryItems = [
+            URLQueryItem(name: "search_terms", value: query),
+            URLQueryItem(name: "action", value: "process"),
+            URLQueryItem(name: "json", value: "1"),
+            URLQueryItem(name: "page_size", value: "50"),
+            URLQueryItem(name: "fields", value: "code,product_name,brands,nutriments,serving_size,serving_quantity,serving_quantity_unit,quantity")
+        ]
+        
+        urlComponents.queryItems = queryItems
         
         guard let url = urlComponents.url else {
             throw NutritionAPIError.invalidResponse
         }
         
-        // Make the request with error handling
+        var request = URLRequest(url: url)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        
         let data: Data
         let response: URLResponse
         
         do {
-            (data, response) = try await session.data(from: url)
+            (data, response) = try await session.data(for: request)
         } catch let error as NSError {
-            // Handle timeout errors specifically
             if error.code == NSURLErrorTimedOut {
                 throw NutritionAPIError.timeout
             }
-            // Wrap other network errors with descriptive context
             throw NutritionAPIError.networkError(error)
         }
         
-        // Check HTTP response
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NutritionAPIError.invalidResponse
         }
         
-        // Handle rate limiting
         if httpResponse.statusCode == 429 {
             throw NutritionAPIError.rateLimitExceeded
         }
         
-        // Check for successful response
         guard (200...299).contains(httpResponse.statusCode) else {
             throw NutritionAPIError.invalidResponse
         }
         
-        // Parse the response
-        return try parseSearchResponse(data)
+        let results = try parseSearchResponse(data)
+        
+        // Apply simple client-side relevance ranking
+        return rankSearchResults(results, query: query)
     }
     
-    /// Parses the FatSecret search response into NutritionSearchResult objects
-    /// - Parameter data: The JSON response data
-    /// - Returns: Array of nutrition search results
-    /// - Throws: NutritionAPIError if parsing fails
+    /// Parses the OpenFoodFacts search response into NutritionSearchResult objects
     private func parseSearchResponse(_ data: Data) throws -> [NutritionSearchResult] {
         do {
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let response = try JSONDecoder().decode(OpenFoodFactsSearchResponse.self, from: data)
             
-            let response = try decoder.decode(FatSecretSearchResponse.self, from: data)
-            
-            // Handle case where no foods are found
-            guard let foods = response.foods?.food else {
+            guard let products = response.products else {
                 return []
             }
             
-            // Map FatSecret foods to NutritionSearchResult
-            return foods.compactMap { food in
-                // Extract calories from food description
-                guard let calories = extractCalories(from: food.foodDescription) else {
+            return products.compactMap { product in
+                // Extract calories from nutriments
+                guard let nutriments = product.nutriments,
+                      let calories = nutriments.energyKcal ?? nutriments.energy else {
                     return nil
                 }
                 
-                // Parse serving information from description
-                let (servingSize, servingUnit) = parseServingInfo(from: food.foodDescription)
+                // Validate calories are non-negative
+                guard calories >= 0 else {
+                    return nil
+                }
                 
-                // Extract macro data from description
-                let protein = extractMacro(from: food.foodDescription, macroName: "Protein")
-                let carbs = extractMacro(from: food.foodDescription, macroName: "Carbs")
-                let fats = extractMacro(from: food.foodDescription, macroName: "Fat")
+                // Extract macros
+                let protein = nutriments.proteins
+                let carbs = nutriments.carbohydrates
+                let fat = nutriments.fat
+                
+                // Build serving info
+                let servingSize: String?
+                let servingUnit: String?
+                
+                if let servingQuantity = product.servingQuantity {
+                    servingSize = String(format: "%.0f", servingQuantity)
+                    servingUnit = product.servingQuantityUnit ?? "g"
+                } else if let servingSizeStr = product.servingSize {
+                    // Parse serving size string (e.g., "100g", "1 cup")
+                    servingSize = servingSizeStr
+                    servingUnit = nil
+                } else {
+                    servingSize = "100"
+                    servingUnit = "g"
+                }
+                
+                // Parse serving options
+                var servingOptions: [ServingOption] = []
+                
+                // Add default 100g option
+                servingOptions.append(ServingOption(description: "100g", gramWeight: 100))
+                
+                // Add serving size option if available
+                if let servingQuantity = product.servingQuantity {
+                    let unit = product.servingQuantityUnit ?? "g"
+                    let description = "\(String(format: "%.0f", servingQuantity))\(unit)"
+                    servingOptions.append(ServingOption(description: description, gramWeight: servingQuantity))
+                }
+                
+                // Parse quantity field for additional serving info (e.g., "3 x 150 g")
+                if let quantity = product.quantity, !quantity.isEmpty {
+                    // Try to extract gram weight from quantity string
+                    if let gramWeight = extractGramWeight(from: quantity) {
+                        servingOptions.append(ServingOption(description: quantity, gramWeight: gramWeight))
+                    }
+                }
+                
+                // Remove duplicates based on description
+                servingOptions = servingOptions.reduce(into: [ServingOption]()) { result, option in
+                    if !result.contains(where: { $0.description.lowercased() == option.description.lowercased() }) {
+                        result.append(option)
+                    }
+                }
                 
                 return NutritionSearchResult(
-                    id: food.foodId,
-                    name: food.foodName,
+                    id: product.code ?? UUID().uuidString,
+                    name: product.productName?.capitalized(with: .current) ?? "Unknown Product",
                     calories: calories,
                     servingSize: servingSize,
                     servingUnit: servingUnit,
-                    brandName: food.brandName,
+                    brandName: product.brands,
                     protein: protein,
                     carbohydrates: carbs,
-                    fats: fats
+                    fats: fat,
+                    servingOptions: servingOptions
                 )
             }
         } catch {
@@ -192,109 +210,101 @@ actor NutritionAPIClient {
         }
     }
     
-    /// Extracts calorie value from FatSecret food description string
-    /// Format examples:
-    /// - "Per 100g - Calories: 250kcal | Fat: 10.00g | Carbs: 30.00g | Protein: 8.00g"
-    /// - "Per 1 serving - Calories: 150kcal | Fat: 5.00g"
-    /// - Parameter description: The food description string
-    /// - Returns: The calorie value, or nil if not found
-    private func extractCalories(from description: String) -> Double? {
-        // Look for pattern "Calories: XXXkcal" or "Calories: XXX kcal"
-        let pattern = "Calories:\\s*(\\d+(?:\\.\\d+)?)\\s*kcal"
-        
+    /// Extracts gram weight from quantity string (e.g., "3 x 150 g" -> 150)
+    private func extractGramWeight(from quantity: String) -> Double? {
+        // Look for patterns like "150g", "150 g", "3 x 150g"
+        let pattern = #"(\d+(?:\.\d+)?)\s*g"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
             return nil
         }
         
-        let nsString = description as NSString
-        let range = NSRange(location: 0, length: nsString.length)
+        let nsString = quantity as NSString
+        let matches = regex.matches(in: quantity, range: NSRange(location: 0, length: nsString.length))
         
-        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
-            return nil
+        if let match = matches.first, match.numberOfRanges > 1 {
+            let numberRange = match.range(at: 1)
+            let numberString = nsString.substring(with: numberRange)
+            return Double(numberString)
         }
         
-        // Extract the numeric value
-        let calorieRange = match.range(at: 1)
-        let calorieString = nsString.substring(with: calorieRange)
-        
-        return Double(calorieString)
+        return nil
     }
+}
+
+// MARK: - OpenFoodFacts API Response Models
+
+struct OpenFoodFactsSearchResponse: Codable {
+    let count: Int?
+    let page: Int?
+    let pageSize: Int?
+    let products: [OpenFoodFactsProduct]?
     
-    /// Parses serving size and unit from food description
-    /// Format: "Per 100g" or "Per 1 serving" or "Per 1 cup"
-    /// - Parameter description: The food description string
-    /// - Returns: Tuple of (servingSize, servingUnit) or (nil, nil) if not found
-    private func parseServingInfo(from description: String) -> (String?, String?) {
-        // Look for pattern "Per XXX unit" at the start
-        let pattern = "Per\\s+(\\d+(?:\\.\\d+)?)\\s*([a-zA-Z]+)"
-        
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return (nil, nil)
-        }
-        
-        let nsString = description as NSString
-        let range = NSRange(location: 0, length: nsString.length)
-        
-        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
-            return (nil, nil)
-        }
-        
-        // Extract serving size and unit
-        let sizeRange = match.range(at: 1)
-        let unitRange = match.range(at: 2)
-        
-        let size = nsString.substring(with: sizeRange)
-        let unit = nsString.substring(with: unitRange)
-        
-        return (size, unit)
+    enum CodingKeys: String, CodingKey {
+        case count
+        case page
+        case pageSize = "page_size"
+        case products
     }
+}
+
+struct OpenFoodFactsProduct: Codable {
+    let code: String?
+    let productName: String?
+    let brands: String?
+    let quantity: String?
+    let servingSize: String?
+    let servingQuantity: Double?
+    let servingQuantityUnit: String?
+    let nutriments: OpenFoodFactsNutriments?
     
-    /// Extracts a macro value (protein, carbs, or fat) from food description
-    /// Format examples:
-    /// - "Protein: 8.00g"
-    /// - "Fat: 10.00g"
-    /// - "Carbs: 30.00g"
-    /// - Parameter description: The food description string
-    /// - Parameter macroName: The name of the macro to extract (e.g., "Protein", "Fat", "Carbs")
-    /// - Returns: The macro value in grams, or nil if not found
-    private func extractMacro(from description: String, macroName: String) -> Double? {
-        // Look for pattern "MacroName: XXXg" or "MacroName: XXX g"
-        let pattern = "\(macroName):\\s*(\\d+(?:\\.\\d+)?)\\s*g"
-        
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return nil
-        }
-        
-        let nsString = description as NSString
-        let range = NSRange(location: 0, length: nsString.length)
-        
-        guard let match = regex.firstMatch(in: description, options: [], range: range) else {
-            return nil
-        }
-        
-        // Extract the numeric value
-        let valueRange = match.range(at: 1)
-        let valueString = nsString.substring(with: valueRange)
-        
-        return Double(valueString)
+    enum CodingKeys: String, CodingKey {
+        case code
+        case productName = "product_name"
+        case brands
+        case quantity
+        case servingSize = "serving_size"
+        case servingQuantity = "serving_quantity"
+        case servingQuantityUnit = "serving_quantity_unit"
+        case nutriments
     }
 }
 
-// MARK: - FatSecret API Response Models
-
-/// Response structure for FatSecret foods.search API
-struct FatSecretSearchResponse: Codable {
-    let foods: FatSecretFoods?
+struct OpenFoodFactsNutriments: Codable {
+    let energy: Double?
+    let energyKcal: Double?
+    let proteins: Double?
+    let carbohydrates: Double?
+    let fat: Double?
+    
+    enum CodingKeys: String, CodingKey {
+        case energy
+        case energyKcal = "energy-kcal"
+        case proteins
+        case carbohydrates
+        case fat
+    }
 }
 
-struct FatSecretFoods: Codable {
-    let food: [FatSecretFood]?
-}
+// MARK: - Search Result Ranking
 
-struct FatSecretFood: Codable {
-    let foodId: String
-    let foodName: String
-    let foodType: String
-    let brandName: String?
-    let foodDescription: String
+extension NutritionAPIClient {
+    /// Ranks search results by relevance to the query
+    ///
+    /// Simple scoring algorithm:
+    /// - Returns results as-is from OpenFoodFacts API (they handle relevance)
+    /// - Filters out results with no calories
+    /// - Limits to top 25 results
+    ///
+    /// - Parameters:
+    ///   - results: Raw search results from API
+    ///   - query: User's search query (unused, kept for compatibility)
+    /// - Returns: Filtered results (max 25)
+    private func rankSearchResults(_ results: [NutritionSearchResult], query: String) -> [NutritionSearchResult] {
+        // OpenFoodFacts API already returns results in relevance order
+        // Just filter out invalid results and limit to 25
+        return results
+            .filter { $0.calories >= 0 } // Filter out invalid data
+            .prefix(25)
+            .map { $0 }
+    }
 }

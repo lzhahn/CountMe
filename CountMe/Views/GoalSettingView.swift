@@ -29,6 +29,10 @@ struct GoalSettingView: View {
     
     @AppStorage("exerciseBodyWeightKg") private var bodyWeightKg: Double = 70
     @AppStorage("weightLossLbsPerWeek") private var weightLossLbsPerWeek: Double = 1.0
+    @AppStorage("userHeightCm") private var heightCm: Double = 170
+    @AppStorage("userAge") private var age: Int = 30
+    @AppStorage("userSex") private var sex: String = "male"
+    @AppStorage("userActivityLevel") private var activityLevel: String = "moderate"
     
     /// Validation error message
     @State private var validationError: String?
@@ -186,11 +190,14 @@ struct GoalSettingView: View {
     }
     
     private var suggestedDailyCalories: Double {
-        guard bodyWeightKg > 0 else { return 0 }
-        let weightLb = bodyWeightKg * 2.20462
-        let maintenanceCalories = weightLb * 14.0
-        let dailyDeficit = max(weightLossLbsPerWeek, 0) * 3500.0 / 7.0
-        return max(maintenanceCalories - dailyDeficit, 0)
+        CalorieEstimator.suggestedCalories(
+            weightKg: bodyWeightKg,
+            heightCm: heightCm,
+            age: age,
+            sex: CalorieEstimator.Sex(rawValue: sex) ?? .male,
+            activity: CalorieEstimator.ActivityLevel(rawValue: activityLevel) ?? .moderate,
+            lossPerWeekLbs: weightLossLbsPerWeek
+        )
     }
 }
 
@@ -203,10 +210,7 @@ struct GoalSettingView: View {
     
     let tracker = CalorieTracker(
         dataStore: DataStore(modelContext: context),
-        apiClient: NutritionAPIClient(
-            consumerKey: "preview",
-            consumerSecret: "preview"
-        )
+        apiClient: NutritionAPIClient()
     )
     
     GoalSettingView(tracker: tracker)

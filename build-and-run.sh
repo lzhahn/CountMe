@@ -15,17 +15,15 @@ APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/CountMe-cclkaybuifejwjgoaltn
 
 # Check simulator status and boot if needed
 echo "📱 Checking simulator status..."
-SIMULATOR_STATE=$(xcrun simctl list devices | grep "$SIMULATOR_ID" | sed -E 's/.*\(([^)]+)\)$/\1/')
+SIMULATOR_STATE=$(xcrun simctl list devices | grep "$SIMULATOR_ID" | grep -oE '\((Booted|Shutdown)\)' | tr -d '()')
 
-if [[ "$SIMULATOR_STATE" == "Shutdown" ]]; then
+if [[ "$SIMULATOR_STATE" != "Booted" ]]; then
     echo "🔄 Booting simulator..."
-    xcrun simctl boot "$SIMULATOR_ID"
+    xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
     echo "⏳ Waiting for simulator to boot..."
-    sleep 3
-elif [[ "$SIMULATOR_STATE" == "Booted" ]]; then
-    echo "✅ Simulator already running"
+    sleep 5
 else
-    echo "⚠️  Simulator state: $SIMULATOR_STATE"
+    echo "✅ Simulator already running"
 fi
 
 # Open Simulator app if not already open

@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Confirm Steering Followed",
+  "description": "When the agent completes execution, verify that all applicable workspace steering guidelines (project-foundation.md, testing-guidelines.md) were followed during the task.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the work you just completed and confirm that all applicable workspace steering guidelines were followed. Check against the rules in .kiro/steering/ (project-foundation.md, testing-guidelines.md). If any guidelines were missed or violated, list them and fix the issues."
+  },
+  "workspaceFolderName": "CountMe",
+  "shortName": "confirm-steering-followed"
+}

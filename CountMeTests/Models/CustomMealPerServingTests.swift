@@ -21,9 +21,9 @@ struct CustomMealPerServingTests {
     // MARK: - Test Fixtures
     
     /// Creates a test custom meal with specified servings count
-    func createTestMeal(servingsCount: Double) -> CustomMeal {
+    func createTestMeal(servingsCount: Double) throws -> CustomMeal {
         let ingredients = [
-            Ingredient(
+            try Ingredient(
                 name: "Chicken Breast",
                 quantity: 200,
                 unit: "g",
@@ -32,7 +32,7 @@ struct CustomMealPerServingTests {
                 carbohydrates: 0,
                 fats: 7.2
             ),
-            Ingredient(
+            try Ingredient(
                 name: "Rice",
                 quantity: 150,
                 unit: "g",
@@ -41,7 +41,7 @@ struct CustomMealPerServingTests {
                 carbohydrates: 43,
                 fats: 0.3
             ),
-            Ingredient(
+            try Ingredient(
                 name: "Broccoli",
                 quantity: 100,
                 unit: "g",
@@ -52,7 +52,7 @@ struct CustomMealPerServingTests {
             )
         ]
         
-        return CustomMeal(
+        return try CustomMeal(
             name: "Chicken and Rice Bowl",
             ingredients: ingredients,
             servingsCount: servingsCount
@@ -63,7 +63,7 @@ struct CustomMealPerServingTests {
     
     @Test("Per-serving calories calculated correctly with servingsCount = 4")
     func testPerServingCalories_WithFourServings_CalculatesCorrectly() async throws {
-        let meal = createTestMeal(servingsCount: 4.0)
+        let meal = try createTestMeal(servingsCount: 4.0)
         
         // Total: 330 + 195 + 35 = 560 calories
         // Per serving: 560 / 4 = 140 calories
@@ -74,7 +74,7 @@ struct CustomMealPerServingTests {
     
     @Test("Per-serving protein calculated correctly with servingsCount = 4")
     func testPerServingProtein_WithFourServings_CalculatesCorrectly() async throws {
-        let meal = createTestMeal(servingsCount: 4.0)
+        let meal = try createTestMeal(servingsCount: 4.0)
         
         // Total: 62 + 4.5 + 2.8 = 69.3g protein
         // Per serving: 69.3 / 4 = 17.325g
@@ -85,7 +85,7 @@ struct CustomMealPerServingTests {
     
     @Test("Per-serving carbohydrates calculated correctly with servingsCount = 4")
     func testPerServingCarbohydrates_WithFourServings_CalculatesCorrectly() async throws {
-        let meal = createTestMeal(servingsCount: 4.0)
+        let meal = try createTestMeal(servingsCount: 4.0)
         
         // Total: 0 + 43 + 7 = 50g carbs
         // Per serving: 50 / 4 = 12.5g
@@ -96,7 +96,7 @@ struct CustomMealPerServingTests {
     
     @Test("Per-serving fats calculated correctly with servingsCount = 4")
     func testPerServingFats_WithFourServings_CalculatesCorrectly() async throws {
-        let meal = createTestMeal(servingsCount: 4.0)
+        let meal = try createTestMeal(servingsCount: 4.0)
         
         // Total: 7.2 + 0.3 + 0.4 = 7.9g fats
         // Per serving: 7.9 / 4 = 1.975g
@@ -109,28 +109,28 @@ struct CustomMealPerServingTests {
     
     @Test("Per-serving calories returns nil when servingsCount = 1")
     func testPerServingCalories_WithOneServing_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 1.0)
+        let meal = try createTestMeal(servingsCount: 1.0)
         
         #expect(meal.perServingCalories == nil)
     }
     
     @Test("Per-serving protein returns nil when servingsCount = 1")
     func testPerServingProtein_WithOneServing_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 1.0)
+        let meal = try createTestMeal(servingsCount: 1.0)
         
         #expect(meal.perServingProtein == nil)
     }
     
     @Test("Per-serving carbohydrates returns nil when servingsCount = 1")
     func testPerServingCarbohydrates_WithOneServing_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 1.0)
+        let meal = try createTestMeal(servingsCount: 1.0)
         
         #expect(meal.perServingCarbohydrates == nil)
     }
     
     @Test("Per-serving fats returns nil when servingsCount = 1")
     func testPerServingFats_WithOneServing_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 1.0)
+        let meal = try createTestMeal(servingsCount: 1.0)
         
         #expect(meal.perServingFats == nil)
     }
@@ -139,28 +139,28 @@ struct CustomMealPerServingTests {
     
     @Test("Per-serving calories returns nil when servingsCount = 0")
     func testPerServingCalories_WithZeroServings_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 0.0)
+        let meal = try createTestMeal(servingsCount: 0.0)
         
         #expect(meal.perServingCalories == nil)
     }
     
     @Test("Per-serving protein returns nil when servingsCount = 0")
     func testPerServingProtein_WithZeroServings_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 0.0)
+        let meal = try createTestMeal(servingsCount: 0.0)
         
         #expect(meal.perServingProtein == nil)
     }
     
     @Test("Per-serving carbohydrates returns nil when servingsCount = 0")
     func testPerServingCarbohydrates_WithZeroServings_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 0.0)
+        let meal = try createTestMeal(servingsCount: 0.0)
         
         #expect(meal.perServingCarbohydrates == nil)
     }
     
     @Test("Per-serving fats returns nil when servingsCount = 0")
     func testPerServingFats_WithZeroServings_ReturnsNil() async throws {
-        let meal = createTestMeal(servingsCount: 0.0)
+        let meal = try createTestMeal(servingsCount: 0.0)
         
         #expect(meal.perServingFats == nil)
     }
@@ -169,28 +169,28 @@ struct CustomMealPerServingTests {
     
     @Test("hasMultipleServings returns true when servingsCount > 1")
     func testHasMultipleServings_WithFourServings_ReturnsTrue() async throws {
-        let meal = createTestMeal(servingsCount: 4.0)
+        let meal = try createTestMeal(servingsCount: 4.0)
         
         #expect(meal.hasMultipleServings == true)
     }
     
     @Test("hasMultipleServings returns false when servingsCount = 1")
     func testHasMultipleServings_WithOneServing_ReturnsFalse() async throws {
-        let meal = createTestMeal(servingsCount: 1.0)
+        let meal = try createTestMeal(servingsCount: 1.0)
         
         #expect(meal.hasMultipleServings == false)
     }
     
     @Test("hasMultipleServings returns false when servingsCount = 0")
     func testHasMultipleServings_WithZeroServings_ReturnsFalse() async throws {
-        let meal = createTestMeal(servingsCount: 0.0)
+        let meal = try createTestMeal(servingsCount: 0.0)
         
         #expect(meal.hasMultipleServings == false)
     }
     
     @Test("hasMultipleServings returns true with fractional servings > 1")
     func testHasMultipleServings_WithFractionalServings_ReturnsTrue() async throws {
-        let meal = createTestMeal(servingsCount: 2.5)
+        let meal = try createTestMeal(servingsCount: 2.5)
         
         #expect(meal.hasMultipleServings == true)
     }

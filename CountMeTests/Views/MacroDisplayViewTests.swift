@@ -292,9 +292,9 @@ struct MacroDisplayViewTests {
     // MARK: - Integration with DailyLog Tests
     
     @Test("MacroDisplayView can display DailyLog macros")
-    func testDisplayDailyLogMacros() {
+    func testDisplayDailyLogMacros() throws {
         // Create a sample daily log with food items
-        let foodItem1 = FoodItem(
+        let foodItem1 = try FoodItem(
             name: "Chicken Breast",
             calories: 165,
             protein: 31,
@@ -302,7 +302,7 @@ struct MacroDisplayViewTests {
             fats: 3.6
         )
         
-        let foodItem2 = FoodItem(
+        let foodItem2 = try FoodItem(
             name: "Brown Rice",
             calories: 216,
             protein: 5,
@@ -310,7 +310,7 @@ struct MacroDisplayViewTests {
             fats: 1.8
         )
         
-        let dailyLog = DailyLog(
+        let dailyLog = try DailyLog(
             date: Date(),
             foodItems: [foodItem1, foodItem2]
         )
@@ -331,10 +331,10 @@ struct MacroDisplayViewTests {
     
     @Test("MacroDisplayView can display CustomMeal macros")
     func testDisplayCustomMealMacros() {
-        let meal = CustomMeal(
+        let meal = try! CustomMeal(
             name: "Chicken Stir Fry",
             ingredients: [
-                Ingredient(
+                try! Ingredient(
                     name: "Chicken Breast",
                     quantity: 6,
                     unit: "oz",
@@ -343,7 +343,7 @@ struct MacroDisplayViewTests {
                     carbohydrates: 0,
                     fats: 4
                 ),
-                Ingredient(
+                try! Ingredient(
                     name: "White Rice",
                     quantity: 1,
                     unit: "cup",
@@ -369,10 +369,10 @@ struct MacroDisplayViewTests {
     
     @Test("MacroDisplayView can display CustomMeal macros with serving multiplier")
     func testDisplayCustomMealMacrosWithServingMultiplier() {
-        let meal = CustomMeal(
+        let meal = try! CustomMeal(
             name: "Protein Shake",
             ingredients: [
-                Ingredient(
+                try! Ingredient(
                     name: "Protein Powder",
                     quantity: 1,
                     unit: "scoop",

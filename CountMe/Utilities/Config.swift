@@ -2,10 +2,13 @@
 //  Config.swift
 //  CountMe
 //
+//  Delegates to Secrets.swift for all credentials.
+//  This file is safe to commit — no secrets here.
+//
 
 import Foundation
 
 enum Config {
-    static let fatSecretConsumerKey = "f6ea16ea33214c2bbdad5c8d2b246416"
-    static let fatSecretConsumerSecret = "0ce583bea87b4308bbbae011e9136c0b"
+    // OpenFoodFacts doesn't require an API key
+    // Just need to provide a User-Agent header in requests
 }

@@ -148,15 +148,8 @@ final class CustomMealManager {
             isLoading = false
         }
         
-        // Validate servingsCount
-        guard servingsCount > 0 else {
-            let error = ValidationError.invalidServingCount
-            errorMessage = error.localizedDescription
-            throw error
-        }
-        
         do {
-            let meal = CustomMeal(
+            let meal = try CustomMeal(
                 name: name,
                 ingredients: ingredients,
                 createdAt: Date(),
@@ -186,6 +179,9 @@ final class CustomMealManager {
             await loadAllCustomMeals()
             
             return meal
+        } catch let error as ValidationError {
+            errorMessage = error.errorDescription ?? "Unable to save custom meal. Please try again."
+            throw error
         } catch {
             errorMessage = "Unable to save custom meal. Please try again."
             throw error
@@ -390,7 +386,7 @@ final class CustomMealManager {
                 ? "1 serving"
                 : "\(String(format: "%g", servingMultiplier)) servings"
             
-            let foodItem = FoodItem(
+            let foodItem = try FoodItem(
                 name: meal.name,
                 calories: meal.totalCalories * perServingFactor,
                 timestamp: Date(),
@@ -408,10 +404,26 @@ final class CustomMealManager {
             meal.lastUsedAt = Date()
             try await dataStore.updateCustomMeal(meal)
             
+            // Sync the food item and updated daily log to cloud if authenticated
+            if let syncEngine = syncEngine, let userId = userId {
+                foodItem.userId = userId
+                foodItem.lastModified = Date()
+                foodItem.syncStatus = .pendingUpload
+                
+                try await syncEngine.syncFoodItem(foodItem, userId: userId)
+                
+                log.userId = userId
+                log.lastModified = Date()
+                try await syncEngine.syncDailyLog(log, userId: userId)
+            }
+            
             // Reload meals to reflect updated lastUsedAt
             await loadAllCustomMeals()
             
             return [foodItem]
+        } catch let error as ValidationError {
+            errorMessage = error.errorDescription ?? "Unable to add custom meal to log. Please try again."
+            throw error
         } catch {
             errorMessage = "Unable to add custom meal to log. Please try again."
             throw error

@@ -3,8 +3,9 @@
 xcuserdata/
 build/
 
-# Secrets
+# Secrets — never commit actual credentials
 CountMe/Secrets.swift
+CountMe/Utilities/Secrets.swift
 CountMe/Config.local.xcconfig
 
 # Firebase - Uncomment the line below if you want to keep your Firebase config private
@@ -12,4 +13,3 @@ CountMe/Config.local.xcconfig
 
 # macOS
 .DS_Store
-CountMe/Utilities/Secrets.swift

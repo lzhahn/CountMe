@@ -297,6 +297,8 @@ actor DataStore {
     /// - Parameter log: The daily log to update
     /// - Throws: SwiftData errors if save operation fails
     func updateDailyLog(_ log: DailyLog) async throws {
+        // Normalize the date to ensure consistent date-based lookups
+        log.date = normalizeDate(log.date)
         try modelContext.save()
     }
     
@@ -417,6 +419,8 @@ actor DataStore {
     /// - Parameter log: The daily log to insert
     /// - Throws: SwiftData errors if insert operation fails
     func insertDailyLog(_ log: DailyLog) async throws {
+        // Normalize the date to ensure consistent date-based lookups
+        log.date = normalizeDate(log.date)
         modelContext.insert(log)
         try modelContext.save()
     }

@@ -2,7 +2,7 @@
 //  OAuth1SignatureGenerator.swift
 //  CountMe
 //
-//  OAuth 1.0 signature generator for FatSecret API authentication
+//  OAuth 1.0 signature generator (retained for potential future use)
 //
 
 import Foundation

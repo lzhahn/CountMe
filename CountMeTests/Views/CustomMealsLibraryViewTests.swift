@@ -286,12 +286,12 @@ final class CustomMealsLibraryViewTests: XCTestCase {
     func testMealNutritionalSummary() async throws {
         // Create meal with known nutritional values
         let ingredients = [
-            Ingredient(name: "Chicken", quantity: 6, unit: "oz", calories: 187, protein: 35, carbohydrates: 0, fats: 4),
-            Ingredient(name: "Rice", quantity: 1, unit: "cup", calories: 206, protein: 4, carbohydrates: 45, fats: 0.4),
-            Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
+            try! Ingredient(name: "Chicken", quantity: 6, unit: "oz", calories: 187, protein: 35, carbohydrates: 0, fats: 4),
+            try! Ingredient(name: "Rice", quantity: 1, unit: "cup", calories: 206, protein: 4, carbohydrates: 45, fats: 0.4),
+            try! Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
         ]
         
-        let meal = CustomMeal(name: "Balanced Meal", ingredients: ingredients)
+        let meal = try! CustomMeal(name: "Balanced Meal", ingredients: ingredients)
         
         // Verify computed totals
         XCTAssertEqual(meal.totalCalories, 424, accuracy: 0.1)
@@ -303,12 +303,12 @@ final class CustomMealsLibraryViewTests: XCTestCase {
     func testMealWithPartialMacros() async throws {
         // Create meal where some ingredients lack macro data
         let ingredients = [
-            Ingredient(name: "Item 1", quantity: 1, unit: "serving", calories: 100, protein: 10, carbohydrates: nil, fats: nil),
-            Ingredient(name: "Item 2", quantity: 1, unit: "serving", calories: 200, protein: nil, carbohydrates: 20, fats: nil),
-            Ingredient(name: "Item 3", quantity: 1, unit: "serving", calories: 150, protein: nil, carbohydrates: nil, fats: 5)
+            try! Ingredient(name: "Item 1", quantity: 1, unit: "serving", calories: 100, protein: 10, carbohydrates: nil, fats: nil),
+            try! Ingredient(name: "Item 2", quantity: 1, unit: "serving", calories: 200, protein: nil, carbohydrates: 20, fats: nil),
+            try! Ingredient(name: "Item 3", quantity: 1, unit: "serving", calories: 150, protein: nil, carbohydrates: nil, fats: 5)
         ]
         
-        let meal = CustomMeal(name: "Partial Macros Meal", ingredients: ingredients)
+        let meal = try! CustomMeal(name: "Partial Macros Meal", ingredients: ingredients)
         
         // Verify totals treat nil as zero
         XCTAssertEqual(meal.totalCalories, 450)
@@ -344,7 +344,7 @@ final class CustomMealsLibraryViewTests: XCTestCase {
     /// Creates a sample custom meal for testing
     private func createSampleMeal(name: String, calories: Double) -> CustomMeal {
         let ingredients = [
-            Ingredient(
+            try! Ingredient(
                 name: "Ingredient 1",
                 quantity: 1,
                 unit: "cup",
@@ -353,7 +353,7 @@ final class CustomMealsLibraryViewTests: XCTestCase {
                 carbohydrates: 20,
                 fats: 5
             ),
-            Ingredient(
+            try! Ingredient(
                 name: "Ingredient 2",
                 quantity: 1,
                 unit: "oz",
@@ -362,7 +362,7 @@ final class CustomMealsLibraryViewTests: XCTestCase {
                 carbohydrates: 15,
                 fats: 3
             ),
-            Ingredient(
+            try! Ingredient(
                 name: "Ingredient 3",
                 quantity: 1,
                 unit: "serving",
@@ -373,7 +373,7 @@ final class CustomMealsLibraryViewTests: XCTestCase {
             )
         ]
         
-        return CustomMeal(
+        return try! CustomMeal(
             name: name,
             ingredients: ingredients,
             createdAt: Date(),
@@ -493,9 +493,9 @@ final class CustomMealsLibraryViewTests: XCTestCase {
     func testPerServingMacrosCalculation() async throws {
         // Create meal with known macro values
         let ingredients = [
-            Ingredient(name: "Ingredient", quantity: 1, unit: "batch", calories: 800, protein: 40, carbohydrates: 80, fats: 20)
+            try! Ingredient(name: "Ingredient", quantity: 1, unit: "batch", calories: 800, protein: 40, carbohydrates: 80, fats: 20)
         ]
-        let meal = CustomMeal(name: "Macro Test Meal", ingredients: ingredients, servingsCount: 4.0)
+        let meal = try! CustomMeal(name: "Macro Test Meal", ingredients: ingredients, servingsCount: 4.0)
         
         try await dataStore.saveCustomMeal(meal)
         await manager.loadAllCustomMeals()

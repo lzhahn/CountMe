@@ -34,8 +34,8 @@ struct CustomMealsLibraryView: View {
     /// Search query text
     @State private var searchQuery: String = ""
     
-    /// Controls navigation to recipe input view
-    @State private var showingRecipeInput: Bool = false
+    /// Controls navigation to custom meal method picker
+    @State private var showingMealMethodPicker: Bool = false
     
     /// Task for debounced search
     @State private var searchTask: Task<Void, Never>?
@@ -90,14 +90,14 @@ struct CustomMealsLibraryView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showingRecipeInput = true
+                        showingMealMethodPicker = true
                     } label: {
                         Label("Add Meal", systemImage: "plus")
                     }
                 }
             }
-            .sheet(isPresented: $showingRecipeInput) {
-                RecipeInputView(manager: manager)
+            .sheet(isPresented: $showingMealMethodPicker) {
+                CustomMealMethodPickerView(manager: manager)
             }
             .task {
                 // Load meals when view appears
@@ -283,14 +283,14 @@ struct CustomMealsLibraryView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Create your first custom meal by describing a recipe. Our AI will break it down into ingredients with nutritional information.")
+            Text("Create your first custom meal using AI parsing or manual entry.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
             
             Button {
-                showingRecipeInput = true
+                showingMealMethodPicker = true
             } label: {
                 HStack {
                     Image(systemName: "plus.circle.fill")
@@ -523,36 +523,36 @@ struct CustomMealRow: View {
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     
     // Add some sample meals for preview
-    let sampleMeal1 = CustomMeal(
+    let sampleMeal1 = try! CustomMeal(
         name: "Chicken Stir Fry",
         ingredients: [
-            Ingredient(name: "Chicken Breast", quantity: 6, unit: "oz", calories: 187, protein: 35, carbohydrates: 0, fats: 4),
-            Ingredient(name: "White Rice", quantity: 1, unit: "cup", calories: 206, protein: 4, carbohydrates: 45, fats: 0.4),
-            Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
+            try! Ingredient(name: "Chicken Breast", quantity: 6, unit: "oz", calories: 187, protein: 35, carbohydrates: 0, fats: 4),
+            try! Ingredient(name: "White Rice", quantity: 1, unit: "cup", calories: 206, protein: 4, carbohydrates: 45, fats: 0.4),
+            try! Ingredient(name: "Broccoli", quantity: 1, unit: "cup", calories: 31, protein: 2.5, carbohydrates: 6, fats: 0.3)
         ],
         createdAt: Date().addingTimeInterval(-86400 * 7),
         lastUsedAt: Date().addingTimeInterval(-3600),
         servingsCount: 4.0  // Multiple servings
     )
     
-    let sampleMeal2 = CustomMeal(
+    let sampleMeal2 = try! CustomMeal(
         name: "Protein Smoothie",
         ingredients: [
-            Ingredient(name: "Protein Powder", quantity: 1, unit: "scoop", calories: 120, protein: 24, carbohydrates: 3, fats: 1.5),
-            Ingredient(name: "Banana", quantity: 1, unit: "piece", calories: 105, protein: 1.3, carbohydrates: 27, fats: 0.4),
-            Ingredient(name: "Almond Milk", quantity: 1, unit: "cup", calories: 30, protein: 1, carbohydrates: 1, fats: 2.5)
+            try! Ingredient(name: "Protein Powder", quantity: 1, unit: "scoop", calories: 120, protein: 24, carbohydrates: 3, fats: 1.5),
+            try! Ingredient(name: "Banana", quantity: 1, unit: "piece", calories: 105, protein: 1.3, carbohydrates: 27, fats: 0.4),
+            try! Ingredient(name: "Almond Milk", quantity: 1, unit: "cup", calories: 30, protein: 1, carbohydrates: 1, fats: 2.5)
         ],
         createdAt: Date().addingTimeInterval(-86400 * 3),
         lastUsedAt: Date().addingTimeInterval(-7200),
         servingsCount: 1.0  // Single serving
     )
     
-    let sampleMeal3 = CustomMeal(
+    let sampleMeal3 = try! CustomMeal(
         name: "Pasta Salad",
         ingredients: [
-            Ingredient(name: "Pasta", quantity: 2, unit: "cups", calories: 400, protein: 14, carbohydrates: 80, fats: 2),
-            Ingredient(name: "Cherry Tomatoes", quantity: 1, unit: "cup", calories: 27, protein: 1.3, carbohydrates: 6, fats: 0.3),
-            Ingredient(name: "Olive Oil", quantity: 2, unit: "tbsp", calories: 240, protein: 0, carbohydrates: 0, fats: 28)
+            try! Ingredient(name: "Pasta", quantity: 2, unit: "cups", calories: 400, protein: 14, carbohydrates: 80, fats: 2),
+            try! Ingredient(name: "Cherry Tomatoes", quantity: 1, unit: "cup", calories: 27, protein: 1.3, carbohydrates: 6, fats: 0.3),
+            try! Ingredient(name: "Olive Oil", quantity: 2, unit: "tbsp", calories: 240, protein: 0, carbohydrates: 0, fats: 28)
         ],
         createdAt: Date().addingTimeInterval(-86400 * 2),
         lastUsedAt: Date().addingTimeInterval(-1800),

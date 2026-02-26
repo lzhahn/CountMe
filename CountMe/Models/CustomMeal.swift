@@ -100,6 +100,7 @@ final class CustomMeal: SyncableEntity {
     ///   - createdAt: Creation timestamp (defaults to current date)
     ///   - lastUsedAt: Last used timestamp (defaults to current date)
     ///   - servingsCount: Base serving size (defaults to 1.0)
+    /// - Throws: `ValidationError` if any parameter is invalid
     init(
         id: UUID = UUID(),
         name: String,
@@ -110,6 +111,49 @@ final class CustomMeal: SyncableEntity {
         userId: String = "",
         lastModified: Date = Date(),
         syncStatus: SyncStatus = .pendingUpload
+    ) throws {
+        // Validate name
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw ValidationError.emptyName(modelType: "CustomMeal")
+        }
+        
+        // Validate ingredients array is non-empty
+        guard !ingredients.isEmpty else {
+            throw ValidationError.emptyIngredients
+        }
+        
+        // Validate servingsCount
+        guard servingsCount > 0 else {
+            throw ValidationError.nonPositiveServings(value: servingsCount)
+        }
+        
+        // Assign properties after validation
+        self._id = id
+        self.name = name
+        self.ingredients = ingredients
+        self.createdAt = createdAt
+        self.lastUsedAt = lastUsedAt
+        self.servingsCount = servingsCount
+        self.userId = userId
+        self.lastModified = lastModified
+        self.syncStatus = syncStatus
+    }
+    
+    /// Internal initializer that skips validation for use by deserialization
+    ///
+    /// - Warning: This initializer assumes all values have been pre-validated.
+    ///            Only use this when deserializing from trusted sources that have
+    ///            already performed validation.
+    internal init(
+        validated id: UUID,
+        name: String,
+        ingredients: [Ingredient],
+        createdAt: Date,
+        lastUsedAt: Date,
+        servingsCount: Double,
+        userId: String,
+        lastModified: Date,
+        syncStatus: SyncStatus
     ) {
         self._id = id
         self.name = name
@@ -194,7 +238,15 @@ extension CustomMeal {
             throw SyncError.invalidFirestoreData
         }
         
-        // Parse ingredients array
+        // Range validation (Requirement 6.6, 6.8)
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SyncError.invalidData(reason: "CustomMeal name is empty")
+        }
+        guard servingsCount > 0 else {
+            throw SyncError.invalidData(reason: "CustomMeal servingsCount \(servingsCount) is not positive")
+        }
+        
+        // Parse ingredients array with validation
         let ingredients = try ingredientsData.map { ingredientDict -> Ingredient in
             guard let ingredientIdString = ingredientDict["id"] as? String,
                   let ingredientId = UUID(uuidString: ingredientIdString),
@@ -206,13 +258,21 @@ extension CustomMeal {
                 throw SyncError.invalidFirestoreData
             }
             
+            // Validate ingredient calories (Requirement 6.6)
+            guard calories >= 0 else {
+                throw SyncError.invalidData(reason: "CustomMeal ingredient '\(ingredientName)' has negative calories \(calories)")
+            }
+            guard calories <= ValidationConstants.maxCalories else {
+                throw SyncError.invalidData(reason: "CustomMeal ingredient '\(ingredientName)' calories \(calories) exceeds maximum of \(ValidationConstants.maxCalories)")
+            }
+            
             // Extract optional macro fields
             let protein = ingredientDict["protein"] as? Double
             let carbohydrates = ingredientDict["carbohydrates"] as? Double
             let fats = ingredientDict["fats"] as? Double
             
             return Ingredient(
-                id: ingredientId,
+                validated: ingredientId,
                 name: ingredientName,
                 quantity: quantity,
                 unit: unit,
@@ -224,7 +284,7 @@ extension CustomMeal {
         }
         
         return CustomMeal(
-            id: id,
+            validated: id,
             name: name,
             ingredients: ingredients,
             createdAt: createdAt,

@@ -37,6 +37,7 @@ final class FoodItem: SyncableEntity {
         _id.uuidString
     }
     
+    /// Public throwing initializer with validation
     init(
         id: UUID = UUID(),
         name: String,
@@ -51,6 +52,79 @@ final class FoodItem: SyncableEntity {
         userId: String = "",
         lastModified: Date = Date(),
         syncStatus: SyncStatus = .pendingUpload
+    ) throws {
+        // Validate name
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw ValidationError.emptyName(modelType: "FoodItem")
+        }
+        
+        // Validate calories
+        guard calories >= 0 else {
+            throw ValidationError.negativeCalories(modelType: "FoodItem", value: calories)
+        }
+        guard calories <= ValidationConstants.maxCalories else {
+            throw ValidationError.caloriesExceedMax(modelType: "FoodItem", value: calories, max: ValidationConstants.maxCalories)
+        }
+        
+        // Validate optional macros
+        if let protein = protein {
+            guard protein >= 0 else {
+                throw ValidationError.negativeMacro(modelType: "FoodItem", field: "protein", value: protein)
+            }
+            guard protein <= ValidationConstants.maxMacroGrams else {
+                throw ValidationError.macroExceedMax(modelType: "FoodItem", field: "protein", value: protein, max: ValidationConstants.maxMacroGrams)
+            }
+        }
+        
+        if let carbohydrates = carbohydrates {
+            guard carbohydrates >= 0 else {
+                throw ValidationError.negativeMacro(modelType: "FoodItem", field: "carbohydrates", value: carbohydrates)
+            }
+            guard carbohydrates <= ValidationConstants.maxMacroGrams else {
+                throw ValidationError.macroExceedMax(modelType: "FoodItem", field: "carbohydrates", value: carbohydrates, max: ValidationConstants.maxMacroGrams)
+            }
+        }
+        
+        if let fats = fats {
+            guard fats >= 0 else {
+                throw ValidationError.negativeMacro(modelType: "FoodItem", field: "fats", value: fats)
+            }
+            guard fats <= ValidationConstants.maxMacroGrams else {
+                throw ValidationError.macroExceedMax(modelType: "FoodItem", field: "fats", value: fats, max: ValidationConstants.maxMacroGrams)
+            }
+        }
+        
+        // Assign properties after validation
+        self._id = id
+        self.name = name
+        self.calories = calories
+        self.timestamp = timestamp
+        self.servingSize = servingSize
+        self.servingUnit = servingUnit
+        self.source = source
+        self.protein = protein
+        self.carbohydrates = carbohydrates
+        self.fats = fats
+        self.userId = userId
+        self.lastModified = lastModified
+        self.syncStatus = syncStatus
+    }
+    
+    /// Internal non-throwing initializer for deserialization (skips validation)
+    internal init(
+        validated id: UUID,
+        name: String,
+        calories: Double,
+        timestamp: Date,
+        servingSize: String?,
+        servingUnit: String?,
+        source: FoodItemSource,
+        protein: Double?,
+        carbohydrates: Double?,
+        fats: Double?,
+        userId: String,
+        lastModified: Date,
+        syncStatus: SyncStatus
     ) {
         self._id = id
         self.name = name
@@ -141,8 +215,48 @@ extension FoodItem {
         let carbohydrates = data["carbohydrates"] as? Double
         let fats = data["fats"] as? Double
         
+        // Range validation (Requirement 6.1, 6.2, 6.3, 6.8)
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SyncError.invalidData(reason: "FoodItem name is empty")
+        }
+        guard calories >= 0 else {
+            throw SyncError.invalidData(reason: "FoodItem calories \(calories) is negative")
+        }
+        guard calories <= ValidationConstants.maxCalories else {
+            throw SyncError.invalidData(reason: "FoodItem calories \(calories) exceeds maximum of \(ValidationConstants.maxCalories)")
+        }
+        
+        // Validate optional macros
+        if let protein = protein {
+            guard protein >= 0 else {
+                throw SyncError.invalidData(reason: "FoodItem protein \(protein) is negative")
+            }
+            guard protein <= ValidationConstants.maxMacroGrams else {
+                throw SyncError.invalidData(reason: "FoodItem protein \(protein)g exceeds maximum of \(ValidationConstants.maxMacroGrams)g")
+            }
+        }
+        
+        if let carbohydrates = carbohydrates {
+            guard carbohydrates >= 0 else {
+                throw SyncError.invalidData(reason: "FoodItem carbohydrates \(carbohydrates) is negative")
+            }
+            guard carbohydrates <= ValidationConstants.maxMacroGrams else {
+                throw SyncError.invalidData(reason: "FoodItem carbohydrates \(carbohydrates)g exceeds maximum of \(ValidationConstants.maxMacroGrams)g")
+            }
+        }
+        
+        if let fats = fats {
+            guard fats >= 0 else {
+                throw SyncError.invalidData(reason: "FoodItem fats \(fats) is negative")
+            }
+            guard fats <= ValidationConstants.maxMacroGrams else {
+                throw SyncError.invalidData(reason: "FoodItem fats \(fats)g exceeds maximum of \(ValidationConstants.maxMacroGrams)g")
+            }
+        }
+        
+        // Use internal validated initializer (skips validation since we just validated)
         return FoodItem(
-            id: id,
+            validated: id,
             name: name,
             calories: calories,
             timestamp: timestamp,

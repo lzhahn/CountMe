@@ -79,7 +79,7 @@ struct ExerciseTrackerView: View {
             Text("Today's Exercise")
                 .font(.headline)
             
-            if let items = tracker.currentLog?.exerciseItems, !items.isEmpty {
+            if !tracker.exerciseItemsCache.isEmpty {
                 List {
                     ForEach(sortedItems, id: \.id) { item in
                         ExerciseItemRow(
@@ -124,7 +124,7 @@ struct ExerciseTrackerView: View {
     }
     
     private var sortedItems: [ExerciseItem] {
-        (tracker.currentLog?.exerciseItems ?? [])
+        tracker.exerciseItemsCache
             .sorted { $0.timestamp > $1.timestamp }
     }
     
@@ -133,7 +133,7 @@ struct ExerciseTrackerView: View {
     }
     
     private var totalMinutes: Double {
-        (tracker.currentLog?.exerciseItems ?? [])
+        tracker.exerciseItemsCache
             .reduce(0) { $0 + ($1.durationMinutes ?? 0) }
     }
 }

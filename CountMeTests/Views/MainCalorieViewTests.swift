@@ -30,8 +30,7 @@ struct MainCalorieViewTests {
         let dataStore = DataStore(modelContext: context)
         
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -41,8 +40,8 @@ struct MainCalorieViewTests {
         // Load log and add items
         try await tracker.loadLog(for: Date())
         
-        let item1 = FoodItem(name: "Item 1", calories: 100, source: .manual)
-        let item2 = FoodItem(name: "Item 2", calories: 200, source: .manual)
+        let item1 = try FoodItem(name: "Item 1", calories: 100, source: .manual)
+        let item2 = try FoodItem(name: "Item 2", calories: 200, source: .manual)
         
         try await tracker.addFoodItem(item1)
         try await tracker.addFoodItem(item2)
@@ -92,7 +91,7 @@ struct MainCalorieViewTests {
     
     @Test("FoodItemRow respects selection mode")
     func testFoodItemRowSelectionMode() async throws {
-        let item = FoodItem(
+        let item = try FoodItem(
             name: "Test Item",
             calories: 150,
             source: .manual
@@ -122,8 +121,7 @@ struct MainCalorieViewTests {
         let dataStore = DataStore(modelContext: context)
         
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -134,10 +132,10 @@ struct MainCalorieViewTests {
         try await tracker.loadLog(for: Date())
         
         let items = [
-            FoodItem(name: "Breakfast", calories: 300, source: .manual),
-            FoodItem(name: "Lunch", calories: 500, source: .api),
-            FoodItem(name: "Snack", calories: 150, source: .customMeal),
-            FoodItem(name: "Dinner", calories: 600, source: .manual)
+            try FoodItem(name: "Breakfast", calories: 300, source: .manual),
+            try FoodItem(name: "Lunch", calories: 500, source: .api),
+            try FoodItem(name: "Snack", calories: 150, source: .customMeal),
+            try FoodItem(name: "Dinner", calories: 600, source: .manual)
         ]
         
         for item in items {
@@ -254,8 +252,7 @@ struct MainCalorieViewTests {
         let dataStore = DataStore(modelContext: context)
         
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -289,8 +286,7 @@ struct MainCalorieViewTests {
         let dataStore = DataStore(modelContext: context)
         
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -300,7 +296,7 @@ struct MainCalorieViewTests {
         // Load log and add items
         try await tracker.loadLog(for: Date())
         
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Chicken Breast",
             calories: 165,
             servingSize: "100",
@@ -311,7 +307,7 @@ struct MainCalorieViewTests {
             fats: 3.6
         )
         
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Brown Rice",
             calories: 216,
             servingSize: "1",
@@ -365,8 +361,7 @@ struct MainCalorieViewTests {
         let dataStore = DataStore(modelContext: context)
         
         let apiClient = NutritionAPIClient(
-            consumerKey: "test",
-            consumerSecret: "test"
+            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -376,8 +371,8 @@ struct MainCalorieViewTests {
         // Load log and add items
         try await tracker.loadLog(for: Date())
         
-        let item1 = FoodItem(name: "Item 1", calories: 100, source: .manual)
-        let item2 = FoodItem(name: "Item 2", calories: 200, source: .manual)
+        let item1 = try FoodItem(name: "Item 1", calories: 100, source: .manual)
+        let item2 = try FoodItem(name: "Item 2", calories: 200, source: .manual)
         
         try await tracker.addFoodItem(item1)
         try await tracker.addFoodItem(item2)

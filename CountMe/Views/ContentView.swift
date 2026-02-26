@@ -28,17 +28,17 @@ struct ContentView: View {
     /// Firebase authentication service from environment
     @EnvironmentObject var authService: FirebaseAuthService
     
+    /// Shared sync engine from environment
+    @Environment(\.syncEngine) private var envSyncEngine
+    
+    /// Shared data store from environment
+    @Environment(\.dataStore) private var envDataStore
+    
     /// The calorie tracker business logic instance
     @State private var tracker: CalorieTracker?
     
     /// The custom meal manager business logic instance
     @State private var customMealManager: CustomMealManager?
-    
-    /// The Firebase sync engine for cloud synchronization
-    @State private var syncEngine: FirebaseSyncEngine?
-    
-    /// The data store for local persistence
-    @State private var dataStore: DataStore?
     
     /// Loading state during initialization
     @State private var isLoading = true
@@ -53,8 +53,8 @@ struct ContentView: View {
                 ProgressView("Loading...")
             } else if let tracker = tracker, 
                       let customMealManager = customMealManager,
-                      let syncEngine = syncEngine,
-                      let dataStore = dataStore {
+                      let syncEngine = envSyncEngine,
+                      let dataStore = envDataStore {
                 // Main navigation structure
                 TabView {
                     // Main calorie tracking view
@@ -65,20 +65,8 @@ struct ContentView: View {
                         userId: authService.currentUser?.uid
                     )
                     .tabItem {
-                        Label("Today", systemImage: "house.fill")
+                        Label("Log", systemImage: "list.bullet")
                     }
-                    
-                    // Historical data view
-                    HistoricalView(tracker: tracker)
-                        .tabItem {
-                            Label("History", systemImage: "calendar")
-                        }
-                    
-                    // Exercise tracking view
-                    ExerciseTrackerView(tracker: tracker)
-                        .tabItem {
-                            Label("Exercise", systemImage: "figure.walk")
-                        }
                     
                     // Profile view
                     ProfileView(
@@ -111,6 +99,14 @@ struct ContentView: View {
         .task {
             await initializeTracker()
         }
+        .task(id: "syncReload") {
+            // After initial sync settles, reload the log to pick up cloud data
+            // that arrived via snapshot listeners after the initial loadLog
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if let tracker = tracker {
+                try? await tracker.loadLog(for: tracker.selectedDate)
+            }
+        }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             // Check for date changes when app comes to foreground
             if newPhase == .active, let tracker = tracker {
@@ -125,33 +121,35 @@ struct ContentView: View {
     
     /// Initializes the CalorieTracker with dependencies and loads the current day's log
     private func initializeTracker() async {
-        // Initialize DataStore with model context
-        let newDataStore = DataStore(modelContext: modelContext)
+        // Use the shared DataStore from environment (same instance the sync engine uses)
+        guard let sharedDataStore = envDataStore else {
+            print("⚠️ DataStore not available from environment")
+            isLoading = false
+            return
+        }
         
-        // Initialize NutritionAPIClient with credentials from Config
-        let apiClient = NutritionAPIClient(
-            consumerKey: Config.fatSecretConsumerKey,
-            consumerSecret: Config.fatSecretConsumerSecret
-        )
+        // Initialize NutritionAPIClient for OpenFoodFacts (no API key needed!)
+        let apiClient = NutritionAPIClient()
         
         // Initialize AIRecipeParser
         let aiParser = AIRecipeParser()
         
-        // Create CalorieTracker instance
+        // Create CalorieTracker using the SHARED data store
         let newTracker = CalorieTracker(
-            dataStore: newDataStore,
+            dataStore: sharedDataStore,
             apiClient: apiClient,
-            selectedDate: Date()
+            selectedDate: Date(),
+            syncEngine: envSyncEngine,
+            userId: authService.currentUser?.uid
         )
         
-        // Create CustomMealManager instance
+        // Create CustomMealManager using the SHARED data store
         let newCustomMealManager = CustomMealManager(
-            dataStore: newDataStore,
-            aiParser: aiParser
+            dataStore: sharedDataStore,
+            aiParser: aiParser,
+            syncEngine: envSyncEngine,
+            userId: authService.currentUser?.uid
         )
-        
-        // Create FirebaseSyncEngine instance
-        let newSyncEngine = FirebaseSyncEngine(dataStore: newDataStore)
         
         // Load current day's log
         do {
@@ -161,15 +159,13 @@ struct ContentView: View {
             await MainActor.run {
                 tracker = newTracker
                 customMealManager = newCustomMealManager
-                syncEngine = newSyncEngine
-                dataStore = newDataStore
                 isLoading = false
             }
             
             // Run retention policy on app launch if user is authenticated
-            if let userId = authService.currentUser?.uid {
+            if let userId = authService.currentUser?.uid, let syncEngine = envSyncEngine {
                 print("Running retention policy on app launch for user: \(userId)")
-                newSyncEngine.scheduleRetentionPolicyOnLaunch(userId: userId)
+                syncEngine.scheduleRetentionPolicyOnLaunch(userId: userId)
             }
             
         } catch {
@@ -179,8 +175,6 @@ struct ContentView: View {
             await MainActor.run {
                 tracker = newTracker
                 customMealManager = newCustomMealManager
-                syncEngine = newSyncEngine
-                dataStore = newDataStore
                 isLoading = false
             }
         }

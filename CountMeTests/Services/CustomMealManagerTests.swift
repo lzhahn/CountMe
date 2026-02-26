@@ -33,7 +33,7 @@ struct CustomMealManagerTests {
         unit: String = "g",
         calories: Double = 100
     ) -> Ingredient {
-        return Ingredient(
+        return try! Ingredient(
             name: name,
             quantity: quantity,
             unit: unit,
@@ -118,16 +118,16 @@ struct CustomMealManagerTests {
                 ingredients: ingredients,
                 servingsCount: 0.0
             )
-            Issue.record("Expected ValidationError.invalidServingCount to be thrown")
+            Issue.record("Expected ValidationError.nonPositiveServings to be thrown")
         } catch let error as ValidationError {
-            // Verify it's the specific invalidServingCount case
-            if case .invalidServingCount = error {
+            // Verify it's the specific nonPositiveServings case
+            if case .nonPositiveServings = error {
                 // Success - correct error type
             } else {
-                Issue.record("Expected ValidationError.invalidServingCount, got \(error)")
+                Issue.record("Expected ValidationError.nonPositiveServings, got \(error)")
             }
         } catch {
-            Issue.record("Expected ValidationError.invalidServingCount, got \(error)")
+            Issue.record("Expected ValidationError.nonPositiveServings, got \(error)")
         }
         
         // Verify error message was set
@@ -152,21 +152,21 @@ struct CustomMealManagerTests {
                 ingredients: ingredients,
                 servingsCount: -2.0
             )
-            Issue.record("Expected ValidationError.invalidServingCount to be thrown")
+            Issue.record("Expected ValidationError.nonPositiveServings to be thrown")
         } catch let error as ValidationError {
-            // Verify it's the specific invalidServingCount case
-            if case .invalidServingCount = error {
+            // Verify it's the specific nonPositiveServings case
+            if case .nonPositiveServings = error {
                 // Success - correct error type
             } else {
-                Issue.record("Expected ValidationError.invalidServingCount, got \(error)")
+                Issue.record("Expected ValidationError.nonPositiveServings, got \(error)")
             }
         } catch {
-            Issue.record("Expected ValidationError.invalidServingCount, got \(error)")
+            Issue.record("Expected ValidationError.nonPositiveServings, got \(error)")
         }
         
         // Verify error message was set
         #expect(manager.errorMessage != nil)
-        #expect(manager.errorMessage?.contains("greater than zero") == true)
+        #expect(manager.errorMessage?.contains("positive") == true)
     }
     
     @Test("Save custom meal with fractional servingsCount")

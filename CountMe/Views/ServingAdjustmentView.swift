@@ -11,10 +11,31 @@ import SwiftData
 /// Serving adjustment view that allows users to modify serving amount before adding to log
 ///
 /// This view provides:
-/// - Display of selected food item
-/// - Serving size multiplier adjustment
-/// - Real-time calorie calculation based on serving amount
+/// - Display of selected food item with brand and original serving info
+/// - Serving type selection (when multiple options available from USDA API)
+/// - Serving size multiplier adjustment via text field and stepper
+/// - Real-time calorie and macro calculation based on serving type and amount
 /// - Save and cancel actions
+///
+/// # Serving Type Selection
+/// The view always displays the serving type section:
+/// - **Single option**: Shows read-only display of the serving type
+/// - **Multiple options**: Shows interactive picker using navigation link style for better discoverability
+///
+/// Each serving option displays its gram weight to help users understand conversions.
+///
+/// # Calculation Logic
+/// Calories and macros are calculated as:
+/// ```
+/// adjustedCalories = (calories / originalServingGrams) * selectedServingGrams * multiplier
+/// adjustedMacros = (originalMacros / originalServingGrams) * selectedServingGrams * multiplier
+/// ```
+///
+/// # Example
+/// For chicken breast (165 cal per 100g):
+/// - Select "1 breast (174g)" serving type
+/// - Set multiplier to 2.0
+/// - Result: 574 calories (165 * 1.74 * 2.0)
 struct ServingAdjustmentView: View {
     /// The nutrition search result to adjust
     let searchResult: NutritionSearchResult
@@ -31,6 +52,9 @@ struct ServingAdjustmentView: View {
     /// Text input for serving multiplier
     @State private var servingText: String = "1"
     
+    /// Selected serving option
+    @State private var selectedServingOption: ServingOption
+    
     /// Saving state
     @State private var isSaving: Bool = false
     
@@ -39,6 +63,17 @@ struct ServingAdjustmentView: View {
     
     /// Focus state for text field
     @FocusState private var isServingFieldFocused: Bool
+    
+    init(searchResult: NutritionSearchResult, tracker: CalorieTracker) {
+        self.searchResult = searchResult
+        self.tracker = tracker
+        // Initialize with first serving option or create a default
+        if let firstOption = searchResult.servingOptions.first {
+            _selectedServingOption = State(initialValue: firstOption)
+        } else {
+            _selectedServingOption = State(initialValue: ServingOption(description: "100g", gramWeight: 100))
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -64,6 +99,44 @@ struct ServingAdjustmentView: View {
                     }
                 } header: {
                     Text("Food Item")
+                }
+                
+                // Serving type selection
+                // Always show this section so users can see what serving type they're using
+                Section {
+                    if searchResult.servingOptions.count > 1 {
+                        // Use navigationLink style for better discoverability
+                        // Shows a dedicated screen with all options and their gram weights
+                        Picker("Serving Type", selection: $selectedServingOption) {
+                            ForEach(searchResult.servingOptions) { option in
+                                HStack {
+                                    Text(option.description)
+                                    Spacer()
+                                    Text("(\(Int(option.gramWeight))g)")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                                .tag(option)
+                            }
+                        }
+                        .pickerStyle(.navigationLink)
+                    } else {
+                        // Single option: show read-only display
+                        HStack {
+                            Text("Serving Type")
+                            Spacer()
+                            Text(selectedServingOption.description)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Serving Type")
+                } footer: {
+                    if searchResult.servingOptions.count > 1 {
+                        Text("Select the type of serving you want to track. Each option shows its gram weight.")
+                    } else {
+                        Text("This food has one serving type available.")
+                    }
                 }
                 
                 // Serving adjustment section
@@ -112,15 +185,20 @@ struct ServingAdjustmentView: View {
                             .foregroundColor(.primary)
                     }
                     
-                    if let servingSize = searchResult.servingSize,
-                       let servingUnit = searchResult.servingUnit {
-                        HStack {
-                            Text("Total Amount")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(String(format: "%.1f %@", adjustedServingSize, servingUnit))
-                                .foregroundColor(.secondary)
-                        }
+                    HStack {
+                        Text("Total Amount")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(String(format: "%.1fg", adjustedServingSize))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("Serving Type")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(selectedServingOption.description)
+                            .foregroundColor(.secondary)
                     }
                 } header: {
                     Text("Adjusted Values")
@@ -171,18 +249,24 @@ struct ServingAdjustmentView: View {
     
     // MARK: - Computed Properties
     
-    /// Adjusted calories based on serving multiplier
+    /// Calories per gram based on the original serving
+    private var caloriesPerGram: Double {
+        guard let servingSize = searchResult.servingSize,
+              let size = Double(servingSize),
+              size > 0 else {
+            return searchResult.calories / 100.0 // Default to per 100g
+        }
+        return searchResult.calories / size
+    }
+    
+    /// Adjusted calories based on serving type and multiplier
     private var adjustedCalories: Double {
-        searchResult.calories * servingMultiplier
+        caloriesPerGram * selectedServingOption.gramWeight * servingMultiplier
     }
     
     /// Adjusted serving size based on multiplier
     private var adjustedServingSize: Double {
-        if let servingSize = searchResult.servingSize,
-           let size = Double(servingSize) {
-            return size * servingMultiplier
-        }
-        return servingMultiplier
+        selectedServingOption.gramWeight * servingMultiplier
     }
     
     // MARK: - Actions
@@ -199,27 +283,24 @@ struct ServingAdjustmentView: View {
         
         Task {
             do {
-                // Calculate adjusted serving size string
-                let adjustedServingSizeString: String?
-                if let servingSize = searchResult.servingSize,
-                   let size = Double(servingSize) {
-                    adjustedServingSizeString = String(format: "%.1f", size * servingMultiplier)
-                } else {
-                    adjustedServingSizeString = String(format: "%.1f", servingMultiplier)
-                }
+                // Calculate serving size string based on selected option
+                let adjustedServingSizeString = String(format: "%.1f", selectedServingOption.gramWeight * servingMultiplier)
                 
-                // Calculate adjusted macro values (apply serving multiplier)
-                let adjustedProtein = searchResult.protein.map { $0 * servingMultiplier }
-                let adjustedCarbs = searchResult.carbohydrates.map { $0 * servingMultiplier }
-                let adjustedFats = searchResult.fats.map { $0 * servingMultiplier }
+                // Calculate ratio for macro adjustments
+                let gramRatio = (selectedServingOption.gramWeight * servingMultiplier) / (Double(searchResult.servingSize ?? "100") ?? 100)
+                
+                // Calculate adjusted macro values
+                let adjustedProtein = searchResult.protein.map { $0 * gramRatio }
+                let adjustedCarbs = searchResult.carbohydrates.map { $0 * gramRatio }
+                let adjustedFats = searchResult.fats.map { $0 * gramRatio }
                 
                 // Create FoodItem with adjusted values
-                let foodItem = FoodItem(
+                let foodItem = try FoodItem(
                     name: searchResult.name,
                     calories: adjustedCalories,
                     timestamp: Date(),
                     servingSize: adjustedServingSizeString,
-                    servingUnit: searchResult.servingUnit,
+                    servingUnit: "g",
                     source: .api,
                     protein: adjustedProtein,
                     carbohydrates: adjustedCarbs,
@@ -232,6 +313,12 @@ struct ServingAdjustmentView: View {
                 // Navigate back on success
                 await MainActor.run {
                     dismiss()
+                }
+            } catch let error as ValidationError {
+                // Display validation error message
+                await MainActor.run {
+                    isSaving = false
+                    errorMessage = error.localizedDescription
                 }
             } catch {
                 // Display error message
@@ -258,10 +345,7 @@ struct ServingAdjustmentView: View {
         
         return CalorieTracker(
             dataStore: DataStore(modelContext: context),
-            apiClient: NutritionAPIClient(
-                consumerKey: "preview",
-                consumerSecret: "preview"
-            )
+            apiClient: NutritionAPIClient()
         )
     }()
     
@@ -275,7 +359,12 @@ struct ServingAdjustmentView: View {
             brandName: "Generic",
             protein: 31.0,
             carbohydrates: 0.0,
-            fats: 3.6
+            fats: 3.6,
+            servingOptions: [
+                ServingOption(description: "100g", gramWeight: 100),
+                ServingOption(description: "1 breast (174g)", gramWeight: 174),
+                ServingOption(description: "1 oz (28g)", gramWeight: 28)
+            ]
         ),
         tracker: tracker
     )

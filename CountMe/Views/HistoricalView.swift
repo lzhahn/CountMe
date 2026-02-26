@@ -21,8 +21,8 @@ import SwiftData
 ///
 /// Requirements: 6.1, 6.2, 6.3, 6.5
 struct HistoricalView: View {
-    /// The calorie tracker business logic
-    @Bindable var tracker: CalorieTracker
+    /// DataStore for fetching historical logs
+    let dataStore: DataStore
     
     /// Optional sync engine for cloud synchronization
     var syncEngine: FirebaseSyncEngine?
@@ -31,8 +31,10 @@ struct HistoricalView: View {
     var userId: String?
     
     /// The currently selected date for viewing historical data
-    /// Initialized from tracker's selectedDate
     @State private var selectedDate: Date
+    
+    /// The currently loaded daily log for the selected date
+    @State private var currentLog: DailyLog?
     
     /// Loading state for UI feedback
     @State private var isLoading = false
@@ -52,21 +54,24 @@ struct HistoricalView: View {
     /// Tracks if sync is in progress
     @State private var isSyncing: Bool = false
     
-    /// Initializes the historical view with a calorie tracker
+    /// Initializes the historical view with required dependencies
     /// - Parameters:
-    ///   - tracker: The calorie tracker instance
+    ///   - dataStore: DataStore for fetching historical logs
     ///   - syncEngine: Optional sync engine for cloud synchronization
     ///   - userId: Optional authenticated user ID
+    ///   - initialDate: Initial date to display (defaults to yesterday)
     init(
-        tracker: CalorieTracker,
+        dataStore: DataStore,
         syncEngine: FirebaseSyncEngine? = nil,
-        userId: String? = nil
+        userId: String? = nil,
+        initialDate: Date? = nil
     ) {
-        self.tracker = tracker
+        self.dataStore = dataStore
         self.syncEngine = syncEngine
         self.userId = userId
-        // Initialize selectedDate from tracker's current selectedDate
-        _selectedDate = State(initialValue: tracker.selectedDate)
+        // Default to yesterday if no initial date provided
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        _selectedDate = State(initialValue: initialDate ?? yesterday)
     }
     
     var body: some View {
@@ -84,7 +89,7 @@ struct HistoricalView: View {
                 if isLoading {
                     ProgressView()
                         .padding()
-                } else if let log = tracker.currentLog {
+                } else if let log = currentLog {
                     dailySummarySection(log: log)
                     
                     // Food items list
@@ -440,9 +445,10 @@ struct HistoricalView: View {
     private func loadLogForSelectedDate() async {
         isLoading = true
         do {
-            try await tracker.loadLog(for: selectedDate)
+            currentLog = try await dataStore.fetchDailyLog(for: selectedDate)
         } catch {
             print("Failed to load log for \(selectedDate): \(error)")
+            currentLog = nil
         }
         isLoading = false
     }
@@ -466,7 +472,7 @@ struct HistoricalView: View {
             try await syncEngine.forceSyncNow()
             
             // Reload the current log to show updated data
-            try await tracker.loadLog(for: selectedDate)
+            await loadLogForSelectedDate()
             
             // Show success toast
             await MainActor.run {
@@ -526,35 +532,31 @@ struct HistoricalView: View {
 // MARK: - Preview
 
 #Preview {
-    @Previewable @State var tracker: CalorieTracker = {
+    @Previewable @State var dataStore: DataStore = {
         // Create an in-memory model container for preview
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
         let context = ModelContext(container)
+        let store = DataStore(modelContext: context)
         
-        // Create sample data
+        // Create sample data for yesterday
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-        let sampleLog = DailyLog(
+        let sampleLog = try! DailyLog(
             date: yesterday,
             foodItems: [
-                FoodItem(name: "Breakfast Burrito", calories: 450, timestamp: yesterday.addingTimeInterval(3600)),
-                FoodItem(name: "Salad", calories: 250, timestamp: yesterday.addingTimeInterval(21600)),
-                FoodItem(name: "Chicken Dinner", calories: 600, timestamp: yesterday.addingTimeInterval(43200))
+                try! FoodItem(name: "Breakfast Burrito", calories: 450, timestamp: yesterday.addingTimeInterval(3600)),
+                try! FoodItem(name: "Salad", calories: 250, timestamp: yesterday.addingTimeInterval(21600)),
+                try! FoodItem(name: "Chicken Dinner", calories: 600, timestamp: yesterday.addingTimeInterval(43200))
             ],
             dailyGoal: 2000
         )
         
-        context.insert(sampleLog)
+        Task {
+            try! await store.saveDailyLog(sampleLog)
+        }
         
-        return CalorieTracker(
-            dataStore: DataStore(modelContext: context),
-            apiClient: NutritionAPIClient(
-                consumerKey: "preview",
-                consumerSecret: "preview"
-            ),
-            selectedDate: yesterday
-        )
+        return store
     }()
     
-    return HistoricalView(tracker: tracker)
+    return HistoricalView(dataStore: dataStore, initialDate: Calendar.current.date(byAdding: .day, value: -1, to: Date()))
 }

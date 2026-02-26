@@ -78,6 +78,26 @@ service cloud.firestore {
     }
     
     // ============================================================================
+    // Exercise Items Collection
+    // ============================================================================
+    
+    /// Exercise items collection - stores individual exercise entries
+    /// Path: users/{userId}/exerciseItems/{itemId}
+    /// Access: User can only access their own exercise items
+    /// Validation: userId in document must match authenticated user
+    match /users/{userId}/exerciseItems/{itemId} {
+      // Read: User can read their own exercise items
+      allow read: if isOwner(userId);
+      
+      // Update/Delete: User can modify their own exercise items
+      allow update, delete: if isOwner(userId);
+      
+      // Create: User can create exercise items with their userId
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+    }
+    
+    // ============================================================================
     // Custom Meals Collection
     // ============================================================================
     

@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-CountMe is an iOS calorie tracking app built with SwiftUI and SwiftData. Integrates with FatSecret API for nutrition data, Firebase for auth/sync, with offline-first architecture.
+CountMe is an iOS calorie tracking app built with SwiftUI and SwiftData. Integrates with USDA FoodData Central API for nutrition data, Firebase for auth/sync, with offline-first architecture.
 
 ## Technology Stack
 
 - **Platform**: iOS (SwiftUI) - Target: iPhone 17
 - **Persistence**: SwiftData (local) + Firestore (cloud)
-- **APIs**: FatSecret Platform API (OAuth 1.0), Firebase Auth/Firestore
+- **APIs**: OpenFoodFacts API (no auth required), Firebase Auth/Firestore
 - **Architecture**: MVVM, actor-based concurrency
 - **Testing**: Swift Testing with property-based tests
 
@@ -17,7 +17,7 @@ CountMe is an iOS calorie tracking app built with SwiftUI and SwiftData. Integra
 ### Data Flow
 ```
 SwiftUI Views → View Models → Services → DataStore (SwiftData) / Firestore
-                                      → API Client (FatSecret)
+                                      → API Client (OpenFoodFacts)
 ```
 
 ### Key Components
@@ -44,12 +44,14 @@ All data stored locally (SwiftData) AND cloud (Firestore) when authenticated. Of
 ### Conflict Resolution
 Last-write-wins based on timestamps. Daily logs merge food items from both versions.
 
-## FatSecret API
+## OpenFoodFacts API
 
-- OAuth 1.0 signature-based auth
-- Key endpoints: `foods.search`, `food.get.v2`
-- Parse `foodDescription` for calories (format: "Per 100g - Calories: 250kcal")
+- No API key required (just User-Agent header)
+- Key endpoint: `/cgi/search.pl`
+- Direct nutrient data via `nutriments` object (energy-kcal, proteins, carbohydrates, fat)
 - 30-second timeout, manual entry fallback
+- Global food database with barcode support
+- Free and open source: https://world.openfoodfacts.org
 
 ## Testing Strategy
 
@@ -117,7 +119,7 @@ Swift uses module-based imports. Moving files within the CountMe target does NOT
 ## Common Tasks
 
 - **Add Food**: Validate calories (non-negative) → Create FoodItem → Add to DailyLog → Persist via DataStore
-- **Search API**: Generate OAuth signature → Call endpoint → Parse response → Map to FoodItem
+- **Search API**: Call OpenFoodFacts endpoint with User-Agent → Parse nutriments object → Map to FoodItem
 - **Daily Log**: Normalize date → Fetch/create DailyLog → Load FoodItems → Calculate total
 - **Sign Out**: Stop sync listeners → Reset sync status (clear userId, set pendingUpload) → Retain local data
 

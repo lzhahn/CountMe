@@ -613,7 +613,7 @@ struct IngredientEditRow: View {
 
 #Preview("From Food Items") {
     let sampleFoodItems = [
-        FoodItem(
+        try! FoodItem(
             name: "Grilled Salmon",
             calories: 206,
             servingSize: "100",
@@ -623,7 +623,7 @@ struct IngredientEditRow: View {
             carbohydrates: 0,
             fats: 13
         ),
-        FoodItem(
+        try! FoodItem(
             name: "Quinoa",
             calories: 120,
             servingSize: "0.5",
