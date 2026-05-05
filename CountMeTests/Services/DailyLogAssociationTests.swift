@@ -56,7 +56,7 @@ struct DailyLogAssociationTests {
     func testOrphanedFoodItems_NotVisibleInDailyLog() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Simulate what happens during cloud sync: items inserted separately
         let foodItem = try FoodItem(
@@ -91,7 +91,7 @@ struct DailyLogAssociationTests {
     func testAssociateFoodItems_RestoresCalories() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Insert food items (simulating cloud sync of individual items)
         let apple = try FoodItem(name: "Apple", calories: 95, timestamp: Date(), source: .api, userId: "test-user", syncStatus: .synced)
@@ -125,7 +125,7 @@ struct DailyLogAssociationTests {
     func testAssociateExerciseItems_RestoresBurnedCalories() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Insert exercise item
         let run = try ExerciseItem(name: "Morning Run", caloriesBurned: 300, userId: "test-user", syncStatus: .synced)
@@ -151,7 +151,7 @@ struct DailyLogAssociationTests {
     func testDuplicateAssociation_Prevented() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let apple = try FoodItem(name: "Apple", calories: 95, timestamp: Date(), source: .api, userId: "test-user", syncStatus: .synced)
         try await dataStore.insertFoodItem(apple)
@@ -179,7 +179,7 @@ struct DailyLogAssociationTests {
     func testMissingFoodItemId_HandledGracefully() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let dailyLog = try DailyLog(date: Date(), foodItems: [], userId: "test-user", syncStatus: .synced)
         try await dataStore.insertDailyLog(dailyLog)
@@ -201,7 +201,7 @@ struct DailyLogAssociationTests {
         for _ in 0..<100 {
             let container = try createTestContainer()
             let context = ModelContext(container)
-            let dataStore = DataStore(modelContext: context)
+            let dataStore = DataStore(modelContainer: container)
             
             // Generate random food items
             let count = Int.random(in: 1...15)
@@ -249,7 +249,7 @@ struct DailyLogAssociationTests {
         for _ in 0..<100 {
             let container = try createTestContainer()
             let context = ModelContext(container)
-            let dataStore = DataStore(modelContext: context)
+            let dataStore = DataStore(modelContainer: container)
             
             let itemCount = Int.random(in: 1...10)
             var foodItemIds: [String] = []
@@ -292,7 +292,7 @@ struct DailyLogAssociationTests {
     func testDateBasedDedup_MergesIntoExisting() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -326,7 +326,7 @@ struct DailyLogAssociationTests {
     func testInsertDailyLog_NormalizesDate() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Simulate a cloud date with a time component (e.g. midnight EST stored as UTC)
         // Feb 21 05:00:00 UTC = Feb 21 00:00:00 EST
@@ -354,7 +354,7 @@ struct DailyLogAssociationTests {
     func testUpdateDailyLog_NormalizesDate() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -378,7 +378,7 @@ struct DailyLogAssociationTests {
     func testReloadAfterSync_PicksUpCloudData() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -410,7 +410,7 @@ struct DailyLogAssociationTests {
     func testMergeIntoManagedLog_PersistsFoodItems() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -441,7 +441,7 @@ struct DailyLogAssociationTests {
     func testUnmanagedMergedLog_DoesNotPersist() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -477,7 +477,7 @@ struct DailyLogAssociationTests {
         for _ in 0..<100 {
             let container = try createTestContainer()
             let context = ModelContext(container)
-            let dataStore = DataStore(modelContext: context)
+            let dataStore = DataStore(modelContainer: container)
             
             let today = Calendar.current.startOfDay(for: Date())
             

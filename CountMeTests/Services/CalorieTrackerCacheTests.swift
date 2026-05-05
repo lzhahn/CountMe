@@ -38,7 +38,7 @@ struct CalorieTrackerCacheTests {
     @Test("loadLog updates exerciseItemsCache with existing items")
     func testLoadLog_WithExerciseItems_UpdatesCache() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: NutritionAPIClient())
         
         // Create a daily log with exercise items
@@ -79,7 +79,7 @@ struct CalorieTrackerCacheTests {
     @Test("loadLog initializes empty exerciseItemsCache for new log")
     func testLoadLog_NewLog_InitializesEmptyCache() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: NutritionAPIClient())
         
         let tomorrow = Calendar.current.startOfDay(for: Date().addingTimeInterval(86400))
@@ -94,7 +94,7 @@ struct CalorieTrackerCacheTests {
     @Test("addExerciseItem updates cache via loadLog")
     func testAddExerciseItem_UpdatesCacheThroughReload() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: NutritionAPIClient())
         
         let today = Calendar.current.startOfDay(for: Date())
@@ -123,7 +123,7 @@ struct CalorieTrackerCacheTests {
     @Test("loadLog updates foodItemsCache with existing items")
     func testLoadLog_WithFoodItems_UpdatesCache() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: NutritionAPIClient())
         
         // Create a daily log with food items
@@ -152,7 +152,7 @@ struct CalorieTrackerCacheTests {
     @Test("loadLog populates exerciseItemsCache from database")
     func testLoadLog_WithPersistedExercise_PopulatesCache() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: NutritionAPIClient())
         
         // Create and persist a daily log with exercise items directly in the database
@@ -198,7 +198,7 @@ struct CalorieTrackerCacheTests {
           .tags(.property, .calorieTracking))
     func testProperty_CacheMatchesRelationship_1() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: NutritionAPIClient())
         
         for _ in 0..<100 {

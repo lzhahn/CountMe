@@ -11,6 +11,7 @@ import SwiftData
 @testable import CountMe
 
 @Suite("Exercise Permissions Debug Tests")
+@MainActor
 struct ExercisePermissionsDebugTests {
     
     /// Helper to create test container
@@ -31,7 +32,7 @@ struct ExercisePermissionsDebugTests {
     func testDebug_ExerciseItem_UserIdSetCorrectly() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         // Create exercise item
@@ -71,7 +72,7 @@ struct ExercisePermissionsDebugTests {
     func testDebug_CompareFoodAndExerciseSync() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         let testUserId = "test-user-456"
@@ -81,9 +82,8 @@ struct ExercisePermissionsDebugTests {
             name: "Apple",
             calories: 95,
             protein: 0.5,
-            carbs: 25,
-            fat: 0.3,
-            servingSize: 1.0
+            carbohydrates: 25,
+            fats: 0.3
         )
         
         print("🍎 Food item initial userId: '\(food.userId)'")

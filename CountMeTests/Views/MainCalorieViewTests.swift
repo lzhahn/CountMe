@@ -14,6 +14,7 @@ import Foundation
 /// Tests for MainCalorieView multi-select mode
 /// Validates Requirements 14.1, 14.2
 @Suite("MainCalorieView Multi-Select Tests")
+@MainActor
 struct MainCalorieViewTests {
     
     // MARK: - Test Selection Mode State
@@ -27,10 +28,9 @@ struct MainCalorieViewTests {
             configurations: config
         )
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -118,10 +118,9 @@ struct MainCalorieViewTests {
             configurations: config
         )
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -249,10 +248,9 @@ struct MainCalorieViewTests {
             configurations: config
         )
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -283,10 +281,9 @@ struct MainCalorieViewTests {
             configurations: config
         )
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         let tracker = await MainActor.run {
@@ -358,10 +355,9 @@ struct MainCalorieViewTests {
             configurations: config
         )
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         let tracker = await MainActor.run {

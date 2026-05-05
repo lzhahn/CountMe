@@ -86,7 +86,9 @@ struct CustomMealsLibraryView: View {
                 }
             }
             .navigationTitle("Custom Meals")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -169,7 +171,9 @@ struct CustomMealsLibraryView: View {
             TextField("Search meals...", text: $searchQuery)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
                 .submitLabel(.search)
                 .onChange(of: searchQuery) { _, newValue in
                     // Debounce search: cancel previous task and start new one
@@ -197,7 +201,7 @@ struct CustomMealsLibraryView: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(10)
         .padding()
     }
@@ -516,9 +520,8 @@ struct CustomMealRow: View {
         for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self,
         configurations: config
     )
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let aiParser = AIRecipeParser()
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     

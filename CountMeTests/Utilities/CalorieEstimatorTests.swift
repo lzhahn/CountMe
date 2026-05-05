@@ -249,4 +249,8 @@ extension Tag {
     @Tag static var calorieTracking: Self
     @Tag static var nutritionAPI: Self
     @Tag static var manualIngredientEntry: Self
+    @Tag static var searchRanking: Self
+    @Tag static var exerciseSync: Self
+    @Tag static var servingAdjustment: Self
+    @Tag static var servingOptions: Self
 }

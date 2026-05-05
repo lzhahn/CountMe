@@ -129,11 +129,11 @@ struct MainCalorieView: View {
             }
             .navigationTitle(navigationTitle)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .leadingNavBar) {
                     dateNavigationButtons
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .trailingNavBar) {
                     if selectedSegment == .food {
                         if isSelectionMode {
                             Button("Cancel") {
@@ -414,7 +414,7 @@ struct MainCalorieView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.systemGray6Color)
                 .cornerRadius(12)
             }
         }
@@ -572,7 +572,7 @@ struct MainCalorieView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.systemGray6Color)
                     .cornerRadius(12)
                 }
                 
@@ -969,7 +969,7 @@ struct FloatingMenuButton: View {
                     .foregroundColor(.primary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .background(Color(.systemBackground))
+                    .background(Color.systemBackgroundColor)
                     .cornerRadius(22)
                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             }
@@ -984,9 +984,8 @@ struct FloatingMenuButton: View {
     // Create an in-memory model container for preview
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self, configurations: config)
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let tracker = CalorieTracker(
         dataStore: dataStore,
         apiClient: NutritionAPIClient()

@@ -101,7 +101,9 @@ struct ManualEntryView: View {
                     HStack {
                         TextField("Calories", text: $caloriesText)
                             .focused($focusedField, equals: .calories)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         
                         Text("kcal")
                             .foregroundColor(.secondary)
@@ -116,7 +118,9 @@ struct ManualEntryView: View {
                 Section {
                     TextField("Serving Size (e.g., 100)", text: $servingSize)
                         .focused($focusedField, equals: .servingSize)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
+                        #endif
                     
                     TextField("Serving Unit (e.g., g, oz, cup)", text: $servingUnit)
                         .focused($focusedField, equals: .servingUnit)
@@ -132,7 +136,9 @@ struct ManualEntryView: View {
                     HStack {
                         TextField("Protein", text: $proteinText)
                             .focused($focusedField, equals: .protein)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         
                         Text("g")
                             .foregroundColor(.secondary)
@@ -141,7 +147,9 @@ struct ManualEntryView: View {
                     HStack {
                         TextField("Carbohydrates", text: $carbohydratesText)
                             .focused($focusedField, equals: .carbohydrates)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         
                         Text("g")
                             .foregroundColor(.secondary)
@@ -150,7 +158,9 @@ struct ManualEntryView: View {
                     HStack {
                         TextField("Fats", text: $fatsText)
                             .focused($focusedField, equals: .fats)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         
                         Text("g")
                             .foregroundColor(.secondary)
@@ -175,7 +185,11 @@ struct ManualEntryView: View {
                 }
             }
             .navigationTitle(editingItem == nil ? "Add Food Manually" : "Edit Food")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -353,10 +367,9 @@ struct ManualEntryView: View {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
-    let context = ModelContext(container)
     
     let tracker = CalorieTracker(
-        dataStore: DataStore(modelContext: context),
+        dataStore: DataStore(modelContainer: container),
         apiClient: NutritionAPIClient()
     )
     

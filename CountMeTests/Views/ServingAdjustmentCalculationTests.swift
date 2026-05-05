@@ -11,6 +11,7 @@ import SwiftData
 @testable import CountMe
 
 @Suite("Serving Adjustment Calculation Tests")
+@MainActor
 struct ServingAdjustmentCalculationTests {
     
     // MARK: - Helper Functions
@@ -22,7 +23,7 @@ struct ServingAdjustmentCalculationTests {
         let context = ModelContext(container)
         
         return CalorieTracker(
-            dataStore: DataStore(modelContext: context),
+            dataStore: DataStore(modelContainer: container),
             apiClient: NutritionAPIClient()
         )
     }

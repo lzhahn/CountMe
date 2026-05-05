@@ -117,7 +117,11 @@ struct RecipeInputView: View {
                 .padding()
             }
             .navigationTitle("Add Custom Meal")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -208,7 +212,7 @@ struct RecipeInputView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(.systemGray6))
+            .background(Color.systemGray6Color)
             .cornerRadius(8)
         }
         .buttonStyle(.plain)
@@ -225,7 +229,7 @@ struct RecipeInputView: View {
                 .focused($isTextEditorFocused)
                 .frame(minHeight: 120)
                 .padding(8)
-                .background(Color(.systemGray6))
+                .background(Color.systemGray6Color)
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -363,7 +367,7 @@ struct RecipeInputView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.systemGray6Color)
                 .foregroundColor(.primary)
                 .cornerRadius(10)
             }
@@ -469,7 +473,11 @@ struct IngredientReviewView: View {
             .padding()
         }
         .navigationTitle("Review Ingredients")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -579,7 +587,7 @@ struct IngredientReviewView: View {
                 .padding(.top, 4)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
     
@@ -635,7 +643,7 @@ struct IngredientReviewView: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.systemGray6Color)
             .foregroundColor(.blue)
             .cornerRadius(10)
         }
@@ -652,7 +660,9 @@ struct IngredientReviewView: View {
                     .font(.subheadline)
                 
                 TextField("1", text: $servingCountText)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 60)
                     .multilineTextAlignment(.center)
@@ -675,7 +685,7 @@ struct IngredientReviewView: View {
                 .foregroundColor(.secondary)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
     
@@ -731,7 +741,7 @@ struct IngredientReviewView: View {
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.systemGray6Color)
                     .foregroundColor(.primary)
                     .cornerRadius(10)
             }
@@ -1105,7 +1115,9 @@ struct IngredientRowView: View {
                     HStack(spacing: 8) {
                         HStack(spacing: 4) {
                             TextField("Qty", value: $ingredient.quantity, format: .number)
+                                #if os(iOS)
                                 .keyboardType(.decimalPad)
+                                #endif
                                 .frame(width: 50)
                                 .textFieldStyle(.roundedBorder)
                                 .focused($focusedField, equals: .quantity)
@@ -1129,7 +1141,9 @@ struct IngredientRowView: View {
                         
                         HStack(spacing: 4) {
                             TextField("Cal", value: $ingredient.calories, format: .number)
+                                #if os(iOS)
                                 .keyboardType(.decimalPad)
+                                #endif
                                 .frame(width: 50)
                                 .textFieldStyle(.roundedBorder)
                                 .focused($focusedField, equals: .calories)
@@ -1164,7 +1178,7 @@ struct IngredientRowView: View {
                 .buttonStyle(.plain)
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.systemGray6Color)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -1213,7 +1227,7 @@ struct IngredientRowView: View {
                     .buttonStyle(.bordered)
                 }
                 .padding()
-                .background(Color(.systemGray6).opacity(0.5))
+                .background(Color.systemGray6Color.opacity(0.5))
                 .cornerRadius(8)
             }
         }
@@ -1287,7 +1301,9 @@ struct IngredientRowView: View {
                     .frame(width: 100, alignment: .leading)
                 
                 TextField("Optional", value: value, format: .number)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
                     .textFieldStyle(.roundedBorder)
                     .focused($focusedField, equals: field)
                     .onChange(of: value.wrappedValue) { _, newValue in
@@ -1392,7 +1408,11 @@ struct ManualIngredientEntryView: View {
                 .padding()
             }
             .navigationTitle("Manual Entry")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -1492,7 +1512,7 @@ struct ManualIngredientEntryView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
 
@@ -1549,7 +1569,7 @@ struct ManualIngredientEntryView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.systemGray6Color)
                 .foregroundColor(.blue)
                 .cornerRadius(10)
             }
@@ -1584,7 +1604,9 @@ struct ManualIngredientEntryView: View {
                     .font(.subheadline)
 
                 TextField("1", text: $servingCountText)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 60)
                     .multilineTextAlignment(.center)
@@ -1607,7 +1629,7 @@ struct ManualIngredientEntryView: View {
                 .foregroundColor(.secondary)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
 
@@ -1783,7 +1805,11 @@ struct SaveMealNameSheet: View {
                 Spacer()
             }
             .navigationTitle("Save Custom Meal")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -1814,9 +1840,8 @@ struct SaveMealNameSheet: View {
         for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self,
         configurations: config
     )
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let aiParser = AIRecipeParser()
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     

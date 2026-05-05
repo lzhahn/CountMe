@@ -50,7 +50,7 @@ struct CustomMealManagerTests {
     func testSaveCustomMealWithServingsCount() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -81,7 +81,7 @@ struct CustomMealManagerTests {
     func testSaveCustomMealWithDefaultServingsCount() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -105,7 +105,7 @@ struct CustomMealManagerTests {
     func testSaveCustomMealRejectsZeroServingsCount() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -132,14 +132,14 @@ struct CustomMealManagerTests {
         
         // Verify error message was set
         #expect(manager.errorMessage != nil)
-        #expect(manager.errorMessage?.contains("greater than zero") == true)
+        #expect(manager.errorMessage?.contains("positive") == true)
     }
     
     @Test("Save custom meal rejects negative servingsCount")
     func testSaveCustomMealRejectsNegativeServingsCount() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -173,7 +173,7 @@ struct CustomMealManagerTests {
     func testSaveCustomMealWithFractionalServingsCount() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -198,7 +198,7 @@ struct CustomMealManagerTests {
     func testBackwardCompatibility() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         

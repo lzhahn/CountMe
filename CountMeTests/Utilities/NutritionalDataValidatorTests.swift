@@ -29,11 +29,11 @@ struct NutritionalDataValidatorTests {
     
     @Test("Negative nutritional values should fail validation")
     func testNegativeNutritionalValues() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateNutritionalValue(-10.0, fieldName: "Calories")
         }
         
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateNutritionalValue(-5.0, fieldName: "Protein")
         }
     }
@@ -43,12 +43,12 @@ struct NutritionalDataValidatorTests {
         do {
             try NutritionalDataValidator.validateNutritionalValue(-10.0, fieldName: "Calories")
             Issue.record("Expected validation error")
-        } catch let error as ValidationError {
+        } catch let error as NutritionalValidationError {
             let message = error.errorDescription ?? ""
             #expect(message.contains("Calories"))
             #expect(message.contains("-10"))
         } catch {
-            Issue.record("Expected ValidationError")
+            Issue.record("Expected NutritionalValidationError")
         }
     }
     
@@ -63,14 +63,14 @@ struct NutritionalDataValidatorTests {
     
     @Test("Zero serving size should fail validation")
     func testZeroServingSize() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateServingSize(0.0, fieldName: "Quantity")
         }
     }
     
     @Test("Negative serving size should fail validation")
     func testNegativeServingSize() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateServingSize(-2.0, fieldName: "Serving Multiplier")
         }
     }
@@ -92,7 +92,7 @@ struct NutritionalDataValidatorTests {
     
     @Test("Empty ingredient name should fail validation")
     func testEmptyIngredientName() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateRequiredIngredientFields(
                 name: "",
                 calories: 100.0
@@ -100,7 +100,7 @@ struct NutritionalDataValidatorTests {
         }
         
         // Whitespace-only name should also fail
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateRequiredIngredientFields(
                 name: "   ",
                 calories: 100.0
@@ -110,7 +110,7 @@ struct NutritionalDataValidatorTests {
     
     @Test("Negative calories in required fields should fail validation")
     func testNegativeCaloriesInRequiredFields() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateRequiredIngredientFields(
                 name: "rice",
                 calories: -50.0
@@ -140,7 +140,7 @@ struct NutritionalDataValidatorTests {
     
     @Test("Negative protein should fail comprehensive validation")
     func testNegativeProteinInComprehensiveValidation() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateAllNutritionalValues(
                 calories: 250.0,
                 protein: -5.0,
@@ -152,7 +152,7 @@ struct NutritionalDataValidatorTests {
     
     @Test("Negative carbohydrates should fail comprehensive validation")
     func testNegativeCarbohydratesInComprehensiveValidation() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateAllNutritionalValues(
                 calories: 250.0,
                 protein: 35.0,
@@ -164,7 +164,7 @@ struct NutritionalDataValidatorTests {
     
     @Test("Negative fats should fail comprehensive validation")
     func testNegativeFatsInComprehensiveValidation() {
-        #expect(throws: ValidationError.self) {
+        #expect(throws: NutritionalValidationError.self) {
             try NutritionalDataValidator.validateAllNutritionalValues(
                 calories: 250.0,
                 protein: 35.0,
@@ -182,7 +182,7 @@ struct NutritionalDataValidatorTests {
         let fields = ["Calories", "Protein", "Carbohydrates", "Fats"]
         
         for field in fields {
-            #expect(throws: ValidationError.self) {
+            #expect(throws: NutritionalValidationError.self) {
                 try NutritionalDataValidator.validateNutritionalValue(-1.0, fieldName: field)
             }
         }
@@ -204,36 +204,36 @@ struct NutritionalDataValidatorTests {
         do {
             try NutritionalDataValidator.validateNutritionalValue(-10.0, fieldName: "Protein")
             Issue.record("Expected validation error")
-        } catch let error as ValidationError {
+        } catch let error as NutritionalValidationError {
             let message = error.errorDescription ?? ""
             #expect(message.contains("non-negative"))
             #expect(message.contains("Protein"))
         } catch {
-            Issue.record("Expected ValidationError")
+            Issue.record("Expected NutritionalValidationError")
         }
         
         // Test non-positive value error
         do {
             try NutritionalDataValidator.validateServingSize(0.0, fieldName: "Quantity")
             Issue.record("Expected validation error")
-        } catch let error as ValidationError {
+        } catch let error as NutritionalValidationError {
             let message = error.errorDescription ?? ""
             #expect(message.contains("greater than zero"))
             #expect(message.contains("Quantity"))
         } catch {
-            Issue.record("Expected ValidationError")
+            Issue.record("Expected NutritionalValidationError")
         }
         
         // Test missing field error
         do {
             try NutritionalDataValidator.validateRequiredIngredientFields(name: "", calories: 100.0)
             Issue.record("Expected validation error")
-        } catch let error as ValidationError {
+        } catch let error as NutritionalValidationError {
             let message = error.errorDescription ?? ""
             #expect(message.contains("required"))
             #expect(message.contains("Name"))
         } catch {
-            Issue.record("Expected ValidationError")
+            Issue.record("Expected NutritionalValidationError")
         }
     }
 }

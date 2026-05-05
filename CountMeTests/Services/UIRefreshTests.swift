@@ -31,7 +31,7 @@ struct UIRefreshTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient()
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)
@@ -84,7 +84,7 @@ struct UIRefreshTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient()
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)
@@ -113,7 +113,7 @@ struct UIRefreshTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient()
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)
@@ -149,7 +149,7 @@ struct UIRefreshTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient()
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)
@@ -179,7 +179,7 @@ struct UIRefreshTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient()
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)

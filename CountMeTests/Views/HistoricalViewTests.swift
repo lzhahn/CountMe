@@ -20,7 +20,7 @@ struct HistoricalViewTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create logs for different dates
         let today = Date()
@@ -60,7 +60,7 @@ struct HistoricalViewTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create logs for different dates
         let today = Date()
@@ -95,7 +95,7 @@ struct HistoricalViewTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create log for today only
         let today = Date()
@@ -116,7 +116,7 @@ struct HistoricalViewTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create log with food and exercise
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
@@ -150,7 +150,7 @@ struct HistoricalViewTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create log with goal
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
@@ -175,7 +175,7 @@ struct HistoricalViewTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, ExerciseItem.self, configurations: config)
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create log with specific date
         let calendar = Calendar.current

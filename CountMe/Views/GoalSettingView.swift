@@ -66,7 +66,9 @@ struct GoalSettingView: View {
                     HStack {
                         TextField("Daily Calorie Goal", text: $goalText)
                             .focused($isGoalFieldFocused)
+                            #if os(iOS)
                             .keyboardType(.numberPad)
+                            #endif
                         
                         Text("kcal")
                             .foregroundColor(.secondary)
@@ -105,7 +107,11 @@ struct GoalSettingView: View {
                 }
             }
             .navigationTitle("Daily Goal")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -206,10 +212,9 @@ struct GoalSettingView: View {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
-    let context = ModelContext(container)
     
     let tracker = CalorieTracker(
-        dataStore: DataStore(modelContext: context),
+        dataStore: DataStore(modelContainer: container),
         apiClient: NutritionAPIClient()
     )
     

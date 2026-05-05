@@ -17,7 +17,7 @@ struct CountMeApp: App {
     // Initialize Firebase on app startup and create shared services
     init() {
         FirebaseConfig.shared.configure()
-        self.services = SharedServices(modelContext: sharedModelContainer.mainContext)
+        self.services = SharedServices(modelContainer: sharedModelContainer)
     }
     
     var sharedModelContainer: ModelContainer = {
@@ -70,8 +70,8 @@ struct CountMeApp: App {
         let syncEngine: FirebaseSyncEngine
         let profileSyncService: ProfileSyncService
         
-        init(modelContext: ModelContext) {
-            self.dataStore = DataStore(modelContext: modelContext)
+        init(modelContainer: ModelContainer) {
+            self.dataStore = DataStore(modelContainer: modelContainer)
             self.syncEngine = FirebaseSyncEngine(dataStore: self.dataStore)
             self.profileSyncService = ProfileSyncService()
         }

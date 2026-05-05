@@ -137,32 +137,39 @@ struct CustomMealPerServingTests {
     
     // MARK: - Edge Case: servingsCount = 0
     
-    @Test("Per-serving calories returns nil when servingsCount = 0")
+    @Test("Creating meal with servingsCount = 0 throws validation error")
     func testPerServingCalories_WithZeroServings_ReturnsNil() async throws {
-        let meal = try createTestMeal(servingsCount: 0.0)
-        
-        #expect(meal.perServingCalories == nil)
+        #expect(throws: ValidationError.self) {
+            _ = try createTestMeal(servingsCount: 0.0)
+        }
     }
     
-    @Test("Per-serving protein returns nil when servingsCount = 0")
+    @Test("Creating meal with servingsCount = 0 throws nonPositiveServings")
     func testPerServingProtein_WithZeroServings_ReturnsNil() async throws {
-        let meal = try createTestMeal(servingsCount: 0.0)
-        
-        #expect(meal.perServingProtein == nil)
+        do {
+            _ = try createTestMeal(servingsCount: 0.0)
+            Issue.record("Expected ValidationError.nonPositiveServings")
+        } catch let error as ValidationError {
+            if case .nonPositiveServings = error {
+                // Expected
+            } else {
+                Issue.record("Expected nonPositiveServings, got \(error)")
+            }
+        }
     }
     
-    @Test("Per-serving carbohydrates returns nil when servingsCount = 0")
+    @Test("Zero servingsCount is rejected by validation")
     func testPerServingCarbohydrates_WithZeroServings_ReturnsNil() async throws {
-        let meal = try createTestMeal(servingsCount: 0.0)
-        
-        #expect(meal.perServingCarbohydrates == nil)
+        #expect(throws: ValidationError.self) {
+            _ = try createTestMeal(servingsCount: 0.0)
+        }
     }
     
-    @Test("Per-serving fats returns nil when servingsCount = 0")
+    @Test("Zero servingsCount prevents meal creation")
     func testPerServingFats_WithZeroServings_ReturnsNil() async throws {
-        let meal = try createTestMeal(servingsCount: 0.0)
-        
-        #expect(meal.perServingFats == nil)
+        #expect(throws: ValidationError.self) {
+            _ = try createTestMeal(servingsCount: 0.0)
+        }
     }
     
     // MARK: - hasMultipleServings Tests
@@ -181,11 +188,11 @@ struct CustomMealPerServingTests {
         #expect(meal.hasMultipleServings == false)
     }
     
-    @Test("hasMultipleServings returns false when servingsCount = 0")
+    @Test("hasMultipleServings throws for servingsCount = 0")
     func testHasMultipleServings_WithZeroServings_ReturnsFalse() async throws {
-        let meal = try createTestMeal(servingsCount: 0.0)
-        
-        #expect(meal.hasMultipleServings == false)
+        #expect(throws: ValidationError.self) {
+            _ = try createTestMeal(servingsCount: 0.0)
+        }
     }
     
     @Test("hasMultipleServings returns true with fractional servings > 1")

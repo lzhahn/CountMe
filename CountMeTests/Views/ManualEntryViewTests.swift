@@ -28,9 +28,8 @@ struct ManualEntryViewTests {
         let container = try ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, configurations: config)
         let context = ModelContext(container)
         
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         let tracker = CalorieTracker(dataStore: dataStore, apiClient: apiClient)

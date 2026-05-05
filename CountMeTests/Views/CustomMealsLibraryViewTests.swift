@@ -16,6 +16,7 @@ import SwiftData
 /// - Searching and filtering meals
 /// - Deleting meals
 /// - Empty states
+@MainActor
 final class CustomMealsLibraryViewTests: XCTestCase {
     
     var modelContainer: ModelContainer!
@@ -36,7 +37,7 @@ final class CustomMealsLibraryViewTests: XCTestCase {
         modelContext = ModelContext(modelContainer)
         
         // Initialize dependencies
-        dataStore = CountMe.DataStore(modelContext: modelContext)
+        dataStore = CountMe.DataStore(modelContainer: modelContainer)
         aiParser = AIRecipeParser()
         
         // Initialize manager on main actor

@@ -73,7 +73,7 @@ struct MigrationProgressView: View {
         }
         .padding(32)
         .frame(maxWidth: 400)
-        .background(Color(.systemBackground))
+        .background(Color.systemBackgroundColor)
         .cornerRadius(16)
         .shadow(radius: 10)
         .onAppear {

@@ -274,7 +274,9 @@ private struct SignInView: View {
                 .padding()
             }
             .navigationTitle("Sign In")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .disabled(isSigningIn)
             .sheet(isPresented: $showForgotPassword) {
                 forgotPasswordSheet
@@ -320,11 +322,19 @@ private struct SignInView: View {
                 
                 TextField("Enter your email", text: $email)
                     .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
                     .textContentType(.emailAddress)
+                    #endif
+                    #if os(iOS)
                     .autocapitalization(.none)
+                    #endif
+                    #if os(iOS)
                     .keyboardType(.emailAddress)
+                    #endif
                     .focused($focusedField, equals: .email)
+                    #if os(iOS)
                     .submitLabel(.next)
+                    #endif
                     .onSubmit {
                         focusedField = .password
                     }
@@ -338,9 +348,13 @@ private struct SignInView: View {
                 
                 SecureField("Enter your password", text: $password)
                     .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
                     .textContentType(.password)
+                    #endif
                     .focused($focusedField, equals: .password)
+                    #if os(iOS)
                     .submitLabel(.go)
+                    #endif
                     .onSubmit {
                         Task {
                             await performSignIn()
@@ -522,9 +536,15 @@ private struct SignInView: View {
                     
                     TextField("Enter your email", text: $resetEmail)
                         .textFieldStyle(.roundedBorder)
+                        #if os(iOS)
                         .textContentType(.emailAddress)
+                        #endif
+                        #if os(iOS)
                         .autocapitalization(.none)
+                        #endif
+                        #if os(iOS)
                         .keyboardType(.emailAddress)
+                        #endif
                 }
                 
                 Button {
@@ -546,9 +566,13 @@ private struct SignInView: View {
             }
             .padding()
             .navigationTitle("Forgot Password")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .leadingNavBar) {
                     Button("Cancel") {
                         showForgotPassword = false
                     }
@@ -685,7 +709,9 @@ private struct SignUpView: View {
                 .padding()
             }
             .navigationTitle("Create Account")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .disabled(isCreatingAccount)
         }
     }
@@ -723,11 +749,19 @@ private struct SignUpView: View {
                 
                 TextField("Enter your email", text: $email)
                     .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
                     .textContentType(.emailAddress)
+                    #endif
+                    #if os(iOS)
                     .autocapitalization(.none)
+                    #endif
+                    #if os(iOS)
                     .keyboardType(.emailAddress)
+                    #endif
                     .focused($focusedField, equals: .email)
+                    #if os(iOS)
                     .submitLabel(.next)
+                    #endif
                     .onSubmit {
                         focusedField = .password
                     }
@@ -745,9 +779,13 @@ private struct SignUpView: View {
                 
                 SecureField("Enter your password", text: $password)
                     .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
                     .textContentType(.newPassword)
+                    #endif
                     .focused($focusedField, equals: .password)
+                    #if os(iOS)
                     .submitLabel(.next)
+                    #endif
                     .onSubmit {
                         focusedField = .confirmPassword
                     }
@@ -770,9 +808,13 @@ private struct SignUpView: View {
                 
                 SecureField("Re-enter your password", text: $confirmPassword)
                     .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
                     .textContentType(.newPassword)
+                    #endif
                     .focused($focusedField, equals: .confirmPassword)
+                    #if os(iOS)
                     .submitLabel(.go)
+                    #endif
                     .onSubmit {
                         Task {
                             await performCreateAccount()

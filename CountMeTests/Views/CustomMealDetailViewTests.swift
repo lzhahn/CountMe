@@ -20,6 +20,7 @@ import SwiftData
 /// - Error handling
 ///
 /// **Feature: ai-recipe-tracking**
+@MainActor
 struct CustomMealDetailViewTests {
     
     // MARK: - Test Fixtures
@@ -130,7 +131,7 @@ struct CustomMealDetailViewTests {
     func testAddingMealCreatesCorrectNumberOfFoodItems() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
@@ -158,7 +159,7 @@ struct CustomMealDetailViewTests {
     func testAddingMealWithMultiplierAdjustsCalories() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
@@ -188,7 +189,7 @@ struct CustomMealDetailViewTests {
     func testAddingMealSetsFoodItemSource() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
@@ -216,7 +217,7 @@ struct CustomMealDetailViewTests {
     func testAddingMealUpdatesLastUsedAt() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
@@ -246,7 +247,7 @@ struct CustomMealDetailViewTests {
     func testAddingMealWithZeroMultiplierThrowsError() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
@@ -279,7 +280,7 @@ struct CustomMealDetailViewTests {
     func testAddingMealWithNegativeMultiplierThrowsError() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()
@@ -313,7 +314,7 @@ struct CustomMealDetailViewTests {
     func testDeletingMealRemovesFromDataStore() async throws {
         let container = try createTestContainer()
         let context = ModelContext(container)
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         
         let meal = createSampleMeal()

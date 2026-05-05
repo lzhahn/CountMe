@@ -25,9 +25,8 @@ struct DataFlowTests {
         let context = ModelContext(container)
         
         // Create dependencies
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         // Create tracker
@@ -84,9 +83,8 @@ struct DataFlowTests {
         let context = ModelContext(container)
         
         // Create dependencies
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         // Create tracker
@@ -133,9 +131,8 @@ struct DataFlowTests {
         let context = ModelContext(container)
         
         // Create dependencies
-        let dataStore = DataStore(modelContext: context)
+        let dataStore = DataStore(modelContainer: container)
         let apiClient = NutritionAPIClient(
-            apiKey: "test"
         )
         
         // Create tracker

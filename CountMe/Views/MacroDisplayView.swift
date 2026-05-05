@@ -171,7 +171,7 @@ struct MacroDisplayView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(10)
     }
     

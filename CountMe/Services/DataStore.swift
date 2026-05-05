@@ -8,11 +8,17 @@
 import Foundation
 import SwiftData
 
-actor DataStore {
+/// DataStore provides CRUD operations for SwiftData persistence.
+/// Runs on @MainActor because it uses the container's mainContext,
+/// which is bound to the main thread.
+@MainActor
+final class DataStore {
     private let modelContext: ModelContext
+    private let _modelContainer: ModelContainer
     
-    init(modelContext: ModelContext) {
-        self.modelContext = modelContext
+    init(modelContainer: ModelContainer) {
+        self._modelContainer = modelContainer
+        self.modelContext = modelContainer.mainContext
     }
     
     // MARK: - Date Normalization
@@ -594,5 +600,247 @@ actor DataStore {
         try modelContext.save()
         
         print("✅ Successfully reset sync status for all local data")
+    }
+    
+    // MARK: - Actor-Safe Cloud Sync Operations
+    // These methods keep all SwiftData model access on DataStore's actor,
+    // preventing cross-actor access crashes with @Model objects.
+    
+    /// Associates food items and exercise items with a daily log by their IDs.
+    /// All SwiftData model access stays on this actor.
+    ///
+    /// - Parameters:
+    ///   - dailyLogId: The ID of the daily log to associate items with
+    ///   - foodItemIds: Array of food item ID strings
+    ///   - exerciseItemIds: Array of exercise item ID strings
+    /// - Returns: Tuple of missing food item IDs and missing exercise item IDs not found locally
+    func associateItemsWithDailyLog(
+        dailyLogId: String,
+        foodItemIds: [String],
+        exerciseItemIds: [String]
+    ) async throws -> (missingFoodItemIds: [String], missingExerciseItemIds: [String]) {
+        guard !foodItemIds.isEmpty || !exerciseItemIds.isEmpty else { return ([], []) }
+        
+        guard let dailyLog = try await fetchDailyLog(byId: dailyLogId) else {
+            print("⚠️ DailyLog \(dailyLogId) not found for association")
+            return (foodItemIds, exerciseItemIds)
+        }
+        
+        print("🔗 Associating items with DailyLog \(dailyLogId): \(foodItemIds.count) food, \(exerciseItemIds.count) exercise")
+        
+        var missingFoodIds: [String] = []
+        for foodItemId in foodItemIds {
+            if let foodItem = try await fetchFoodItem(byId: foodItemId) {
+                // Set the inverse relationship directly — SwiftData manages the array
+                foodItem.dailyLog = dailyLog
+            } else {
+                missingFoodIds.append(foodItemId)
+            }
+        }
+        
+        var missingExerciseIds: [String] = []
+        for exerciseItemId in exerciseItemIds {
+            if let exerciseItem = try await fetchExerciseItem(byId: exerciseItemId) {
+                exerciseItem.dailyLog = dailyLog
+            } else {
+                missingExerciseIds.append(exerciseItemId)
+            }
+        }
+        
+        try modelContext.save()
+        return (missingFoodIds, missingExerciseIds)
+    }
+    
+    /// Inserts a food item and associates it with a daily log via inverse relationship.
+    func insertAndAssociateFoodItem(_ item: FoodItem, withDailyLogId dailyLogId: String) async throws {
+        modelContext.insert(item)
+        if let dailyLog = try await fetchDailyLog(byId: dailyLogId) {
+            item.dailyLog = dailyLog
+        }
+        try modelContext.save()
+    }
+    
+    /// Inserts an exercise item and associates it with a daily log via inverse relationship.
+    func insertAndAssociateExerciseItem(_ item: ExerciseItem, withDailyLogId dailyLogId: String) async throws {
+        modelContext.insert(item)
+        if let dailyLog = try await fetchDailyLog(byId: dailyLogId) {
+            item.dailyLog = dailyLog
+        }
+        try modelContext.save()
+    }
+    
+    /// Upserts a food item from cloud with conflict resolution (last-write-wins).
+    /// Returns a description of the action taken.
+    func upsertFoodItemFromCloud(_ cloudItem: FoodItem) async throws -> String {
+        if let localItem = try await fetchFoodItem(byId: cloudItem._id.uuidString) {
+            if localItem.lastModified > cloudItem.lastModified {
+                return "kept_local"
+            } else {
+                // Cloud is newer or same — update local with cloud values
+                localItem.name = cloudItem.name
+                localItem.calories = cloudItem.calories
+                localItem.timestamp = cloudItem.timestamp
+                localItem.servingSize = cloudItem.servingSize
+                localItem.servingUnit = cloudItem.servingUnit
+                localItem.source = cloudItem.source
+                localItem.protein = cloudItem.protein
+                localItem.carbohydrates = cloudItem.carbohydrates
+                localItem.fats = cloudItem.fats
+                localItem.userId = cloudItem.userId
+                localItem.lastModified = cloudItem.lastModified
+                localItem.syncStatus = cloudItem.syncStatus
+                try modelContext.save()
+                return "updated_local"
+            }
+        } else {
+            modelContext.insert(cloudItem)
+            try modelContext.save()
+            return "inserted"
+        }
+    }
+    
+    /// Upserts an exercise item from cloud with conflict resolution (last-write-wins).
+    func upsertExerciseItemFromCloud(_ cloudItem: ExerciseItem) async throws -> String {
+        if let localItem = try await fetchExerciseItem(byId: cloudItem._id.uuidString) {
+            if localItem.lastModified > cloudItem.lastModified {
+                return "kept_local"
+            } else {
+                localItem.name = cloudItem.name
+                localItem.caloriesBurned = cloudItem.caloriesBurned
+                localItem.durationMinutes = cloudItem.durationMinutes
+                localItem.exerciseTypeRaw = cloudItem.exerciseTypeRaw
+                localItem.intensityRaw = cloudItem.intensityRaw
+                localItem.notes = cloudItem.notes
+                localItem.timestamp = cloudItem.timestamp
+                localItem.userId = cloudItem.userId
+                localItem.lastModified = cloudItem.lastModified
+                localItem.syncStatus = cloudItem.syncStatus
+                try modelContext.save()
+                return "updated_local"
+            }
+        } else {
+            modelContext.insert(cloudItem)
+            try modelContext.save()
+            return "inserted"
+        }
+    }
+    
+    /// Upserts a custom meal from cloud with conflict resolution (last-write-wins).
+    func upsertCustomMealFromCloud(_ cloudMeal: CustomMeal) async throws -> String {
+        if let localMeal = try await fetchCustomMeal(byId: cloudMeal._id.uuidString) {
+            if localMeal.lastModified > cloudMeal.lastModified {
+                return "kept_local"
+            } else {
+                localMeal.name = cloudMeal.name
+                localMeal.ingredients = cloudMeal.ingredients
+                localMeal.createdAt = cloudMeal.createdAt
+                localMeal.lastUsedAt = cloudMeal.lastUsedAt
+                localMeal.servingsCount = cloudMeal.servingsCount
+                localMeal.userId = cloudMeal.userId
+                localMeal.lastModified = cloudMeal.lastModified
+                localMeal.syncStatus = cloudMeal.syncStatus
+                try modelContext.save()
+                return "updated_local"
+            }
+        } else {
+            modelContext.insert(cloudMeal)
+            try modelContext.save()
+            return "inserted"
+        }
+    }
+    
+    /// Handles a daily log cloud update with merge logic, all on this actor.
+    /// Returns missing item IDs that need to be downloaded from Firestore.
+    func upsertDailyLogFromCloud(
+        _ cloudLog: DailyLog,
+        foodItemIds: [String],
+        exerciseItemIds: [String]
+    ) async throws -> (missingFoodItemIds: [String], missingExerciseItemIds: [String]) {
+        // Try to find local version by ID
+        if let localLog = try await fetchDailyLog(byId: cloudLog._id.uuidString) {
+            if localLog.lastModified != cloudLog.lastModified {
+                // Timestamps differ — merge: keep newer goal
+                let mergedGoal = localLog.lastModified > cloudLog.lastModified
+                    ? localLog.dailyGoal : cloudLog.dailyGoal
+                localLog.dailyGoal = mergedGoal
+                localLog.lastModified = Date()
+                localLog.syncStatus = .pendingUpload
+            } else {
+                // Same timestamp — update with cloud data
+                localLog.dailyGoal = cloudLog.dailyGoal
+                localLog.lastModified = cloudLog.lastModified
+                localLog.syncStatus = cloudLog.syncStatus
+            }
+            try modelContext.save()
+            let logId = localLog._id.uuidString
+            return try await associateItemsWithDailyLog(
+                dailyLogId: logId,
+                foodItemIds: foodItemIds,
+                exerciseItemIds: exerciseItemIds
+            )
+        }
+        
+        // No ID match — check by date to prevent duplicates
+        let normalizedDate = normalizeDate(cloudLog.date)
+        let descriptor = FetchDescriptor<DailyLog>(
+            predicate: #Predicate { log in log.date == normalizedDate }
+        )
+        let existingLogs = try modelContext.fetch(descriptor)
+        
+        if let existingLog = existingLogs.first {
+            // Merge cloud data into existing date-matched log
+            let mergedGoal = existingLog.lastModified > cloudLog.lastModified
+                ? existingLog.dailyGoal : cloudLog.dailyGoal
+            existingLog.dailyGoal = mergedGoal
+            existingLog.lastModified = Date()
+            existingLog.syncStatus = .pendingUpload
+            try modelContext.save()
+            let logId = existingLog._id.uuidString
+            return try await associateItemsWithDailyLog(
+                dailyLogId: logId,
+                foodItemIds: foodItemIds,
+                exerciseItemIds: exerciseItemIds
+            )
+        }
+        
+        // No local version at all — insert cloud version
+        cloudLog.date = normalizedDate
+        modelContext.insert(cloudLog)
+        try modelContext.save()
+        let logId = cloudLog._id.uuidString
+        return try await associateItemsWithDailyLog(
+            dailyLogId: logId,
+            foodItemIds: foodItemIds,
+            exerciseItemIds: exerciseItemIds
+        )
+    }
+    
+    /// Returns daily log info for logs with empty relationships for a given user.
+    /// Returns plain value types (not model objects) to be safe across actor boundaries.
+    /// Uses reverse queries instead of accessing relationship arrays to avoid SwiftData faulting crashes.
+    func fetchEmptyDailyLogInfo(forUserId userId: String) async throws -> [(id: String, dateKey: String)] {
+        let descriptor = FetchDescriptor<DailyLog>(
+            predicate: #Predicate { log in log.userId == userId }
+        )
+        let userLogs = try modelContext.fetch(descriptor)
+        
+        // Collect IDs of all daily logs that have at least one food or exercise item
+        // by querying from the child side (avoids faulting parent relationship arrays)
+        let foodDescriptor = FetchDescriptor<FoodItem>()
+        let allFoodItems = try modelContext.fetch(foodDescriptor)
+        let logsWithFood = Set(allFoodItems.compactMap { $0.dailyLog?._id })
+        
+        let exerciseDescriptor = FetchDescriptor<ExerciseItem>()
+        let allExerciseItems = try modelContext.fetch(exerciseDescriptor)
+        let logsWithExercise = Set(allExerciseItems.compactMap { $0.dailyLog?._id })
+        
+        let calendar = Calendar.current
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = calendar.timeZone
+        
+        return userLogs
+            .filter { !logsWithFood.contains($0._id) && !logsWithExercise.contains($0._id) }
+            .map { (id: $0._id.uuidString, dateKey: dateFormatter.string(from: calendar.startOfDay(for: $0.date))) }
     }
 }

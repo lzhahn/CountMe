@@ -106,7 +106,7 @@ struct HistoricalView: View {
             .padding()
             .navigationTitle("History")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .trailingNavBar) {
                     if let syncEngine = syncEngine, userId != nil {
                         // Show sync status badge
                         syncStatusBadge
@@ -182,7 +182,7 @@ struct HistoricalView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
     
@@ -205,7 +205,7 @@ struct HistoricalView: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.systemGray6Color)
             .cornerRadius(12)
             
             HStack {
@@ -228,7 +228,7 @@ struct HistoricalView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.systemGray6Color)
             .cornerRadius(12)
             
             // Goal information if set
@@ -256,7 +256,7 @@ struct HistoricalView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.systemGray6Color)
                 .cornerRadius(12)
             }
         }
@@ -536,8 +536,7 @@ struct HistoricalView: View {
         // Create an in-memory model container for preview
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
-        let context = ModelContext(container)
-        let store = DataStore(modelContext: context)
+        let store = DataStore(modelContainer: container)
         
         // Create sample data for yesterday
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()

@@ -105,7 +105,11 @@ struct FoodSearchView: View {
                 }
             }
             .navigationTitle("Search Food")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if isBuildingMeal {
@@ -261,7 +265,9 @@ struct FoodSearchView: View {
             TextField(searchPlaceholder, text: $searchQuery)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
                 .submitLabel(.search)
                 .onSubmit {
                     if selectedTab == .api {
@@ -317,7 +323,7 @@ struct FoodSearchView: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(10)
         .padding()
     }
@@ -584,7 +590,7 @@ struct FoodSearchView: View {
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color.systemBackgroundColor)
         }
     }
     
@@ -628,7 +634,7 @@ struct FoodSearchView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(.systemGray5))
+        .background(Color.systemGray6Color)
         .cornerRadius(16)
     }
     
@@ -1071,9 +1077,8 @@ struct CustomMealRowCompact: View {
     // Create an in-memory model container for preview
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self, configurations: config)
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let tracker = CalorieTracker(
         dataStore: dataStore,
         apiClient: NutritionAPIClient()

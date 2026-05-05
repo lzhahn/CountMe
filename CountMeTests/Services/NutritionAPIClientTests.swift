@@ -2,7 +2,7 @@
 //  NutritionAPIClientTests.swift
 //  CountMeTests
 //
-//  Tests for NutritionAPIClient (USDA FoodData Central)
+//  Tests for NutritionAPIClient (OpenFoodFacts)
 //
 
 import Testing
@@ -58,7 +58,7 @@ class MockURLProtocol: URLProtocol {
 @Suite("NutritionAPIClient Tests", .serialized)
 struct NutritionAPIClientTests {
     
-    private static let baseURL = "https://api.nal.usda.gov/fdc/v1/foods/search"
+    private static let baseURL = "https://world.openfoodfacts.org/cgi/search.pl"
     
     private func makeClient() -> NutritionAPIClient {
         let config = URLSessionConfiguration.ephemeral
@@ -90,36 +90,36 @@ struct NutritionAPIClientTests {
     
     // MARK: - API Search Tests
     
-    @Test("Search returns correctly parsed USDA food results")
+    @Test("Search returns correctly parsed OpenFoodFacts results")
     func testSearchFood_ValidResponse_ReturnsResults() async throws {
         let client = makeClient()
         mockSuccess(json: """
         {
-            "totalHits": 2,
-            "foods": [
+            "count": 2,
+            "page": 1,
+            "page_size": 50,
+            "products": [
                 {
-                    "fdcId": 123,
-                    "description": "APPLE, RAW",
-                    "dataType": "SR Legacy",
-                    "foodNutrients": [
-                        {"nutrientId": 1008, "nutrientName": "Energy", "nutrientNumber": "208", "unitName": "KCAL", "value": 52.0},
-                        {"nutrientId": 1003, "nutrientName": "Protein", "nutrientNumber": "203", "unitName": "G", "value": 0.26},
-                        {"nutrientId": 1005, "nutrientName": "Carbohydrate, by difference", "nutrientNumber": "205", "unitName": "G", "value": 13.81},
-                        {"nutrientId": 1004, "nutrientName": "Total lipid (fat)", "nutrientNumber": "204", "unitName": "G", "value": 0.17}
-                    ]
+                    "code": "123",
+                    "product_name": "apple raw",
+                    "nutriments": {
+                        "energy-kcal": 52.0,
+                        "proteins": 0.26,
+                        "carbohydrates": 13.81,
+                        "fat": 0.17
+                    }
                 },
                 {
-                    "fdcId": 456,
-                    "description": "APPLE JUICE",
-                    "dataType": "Branded",
-                    "brandOwner": "Tropicana",
-                    "servingSize": 240.0,
-                    "servingSizeUnit": "ml",
-                    "foodNutrients": [
-                        {"nutrientId": 1008, "nutrientName": "Energy", "nutrientNumber": "208", "unitName": "KCAL", "value": 120.0},
-                        {"nutrientId": 1005, "nutrientName": "Carbohydrate, by difference", "nutrientNumber": "205", "unitName": "G", "value": 28.0},
-                        {"nutrientId": 1004, "nutrientName": "Total lipid (fat)", "nutrientNumber": "204", "unitName": "G", "value": 0.0}
-                    ]
+                    "code": "456",
+                    "product_name": "apple juice",
+                    "brands": "Tropicana",
+                    "serving_quantity": 240.0,
+                    "serving_quantity_unit": "ml",
+                    "nutriments": {
+                        "energy-kcal": 120.0,
+                        "carbohydrates": 28.0,
+                        "fat": 0.0
+                    }
                 }
             ]
         }
@@ -129,9 +129,9 @@ struct NutritionAPIClientTests {
         
         #expect(results.count == 2)
         
-        // First result
+        // First result (no serving info → defaults to 100g)
         #expect(results[0].id == "123")
-        #expect(results[0].name == "Apple, Raw")
+        #expect(results[0].name == "Apple Raw")
         #expect(results[0].calories == 52.0)
         #expect(results[0].servingSize == "100")
         #expect(results[0].servingUnit == "g")
@@ -141,7 +141,7 @@ struct NutritionAPIClientTests {
         #expect(abs(results[0].carbohydrates! - 13.81) < 0.01)
         #expect(abs(results[0].fats! - 0.17) < 0.01)
         
-        // Second result (branded with serving size)
+        // Second result (branded with serving quantity)
         #expect(results[1].id == "456")
         #expect(results[1].name == "Apple Juice")
         #expect(results[1].calories == 120.0)
@@ -157,18 +157,18 @@ struct NutritionAPIClientTests {
     func testSearchFood_EmptyResults_ReturnsEmptyArray() async throws {
         let client = makeClient()
         mockSuccess(json: """
-        { "totalHits": 0, "foods": [] }
+        { "count": 0, "products": [] }
         """)
         
         let results = try await client.searchFood(query: "nonexistent")
         #expect(results.count == 0)
     }
     
-    @Test("Search with missing foods key returns empty array")
-    func testSearchFood_NoFoodsKey_ReturnsEmptyArray() async throws {
+    @Test("Search with missing products key returns empty array")
+    func testSearchFood_NoProductsKey_ReturnsEmptyArray() async throws {
         let client = makeClient()
         mockSuccess(json: """
-        { "totalHits": 0 }
+        { "count": 0 }
         """)
         
         let results = try await client.searchFood(query: "test")
@@ -266,37 +266,37 @@ struct NutritionAPIClientTests {
             #expect(error.errorDescription!.isEmpty == false)
         }
     }
-    
+
     // MARK: - Nutrient Parsing Tests
     
-    @Test("Foods without Energy nutrient are filtered out")
-    func testSearchFood_NoEnergyNutrient_FilteredOut() async throws {
+    @Test("Products without calories are filtered out")
+    func testSearchFood_NoCalories_FilteredOut() async throws {
         let client = makeClient()
         mockSuccess(json: """
         {
-            "totalHits": 2,
-            "foods": [
+            "count": 2,
+            "products": [
                 {
-                    "fdcId": 123,
-                    "description": "APPLE",
-                    "foodNutrients": [
-                        {"nutrientNumber": "208", "value": 52.0},
-                        {"nutrientNumber": "204", "value": 0.17}
-                    ]
+                    "code": "123",
+                    "product_name": "Apple",
+                    "nutriments": {
+                        "energy-kcal": 52.0,
+                        "fat": 0.17
+                    }
                 },
                 {
-                    "fdcId": 456,
-                    "description": "UNKNOWN FOOD",
-                    "foodNutrients": [
-                        {"nutrientNumber": "204", "value": 0.17}
-                    ]
+                    "code": "456",
+                    "product_name": "Unknown Food",
+                    "nutriments": {
+                        "fat": 0.17
+                    }
                 }
             ]
         }
         """)
         
         let results = try await client.searchFood(query: "test")
-        #expect(results.count == 1, "Should filter out items without Energy nutrient")
+        #expect(results.count == 1, "Should filter out products without calories")
         #expect(results[0].id == "123")
     }
     
@@ -305,14 +305,14 @@ struct NutritionAPIClientTests {
         let client = makeClient()
         mockSuccess(json: """
         {
-            "totalHits": 1,
-            "foods": [{
-                "fdcId": 789,
-                "description": "PARTIAL MACROS FOOD",
-                "foodNutrients": [
-                    {"nutrientNumber": "208", "value": 100.0},
-                    {"nutrientNumber": "205", "value": 20.0}
-                ]
+            "count": 1,
+            "products": [{
+                "code": "789",
+                "product_name": "partial macros food",
+                "nutriments": {
+                    "energy-kcal": 100.0,
+                    "carbohydrates": 20.0
+                }
             }]
         }
         """)
@@ -331,11 +331,11 @@ struct NutritionAPIClientTests {
         let client = makeClient()
         mockSuccess(json: """
         {
-            "totalHits": 1,
-            "foods": [{
-                "fdcId": 100,
-                "description": "GENERIC FOOD",
-                "foodNutrients": [{"nutrientNumber": "208", "value": 200.0}]
+            "count": 1,
+            "products": [{
+                "code": "100",
+                "product_name": "generic food",
+                "nutriments": {"energy-kcal": 200.0}
             }]
         }
         """)
@@ -351,20 +351,19 @@ struct NutritionAPIClientTests {
         let client = makeClient()
         mockSuccess(json: """
         {
-            "totalHits": 1,
-            "foods": [{
-                "fdcId": 200,
-                "description": "PROTEIN BAR",
-                "dataType": "Branded",
-                "brandOwner": "Quest",
-                "servingSize": 60.0,
-                "servingSizeUnit": "g",
-                "foodNutrients": [
-                    {"nutrientNumber": "208", "value": 200.0},
-                    {"nutrientNumber": "203", "value": 20.0},
-                    {"nutrientNumber": "205", "value": 22.0},
-                    {"nutrientNumber": "204", "value": 8.0}
-                ]
+            "count": 1,
+            "products": [{
+                "code": "200",
+                "product_name": "protein bar",
+                "brands": "Quest",
+                "serving_quantity": 60.0,
+                "serving_quantity_unit": "g",
+                "nutriments": {
+                    "energy-kcal": 200.0,
+                    "proteins": 20.0,
+                    "carbohydrates": 22.0,
+                    "fat": 8.0
+                }
             }]
         }
         """)
@@ -382,8 +381,8 @@ struct NutritionAPIClientTests {
 
     // MARK: - Property-Based Tests
     
-    /// Property: Foods with Energy nutrient (208) are always included in results,
-    /// foods without Energy are always excluded.
+    /// Property: Products with energy-kcal are always included in results,
+    /// products without energy are always excluded.
     @Test("Property: Energy nutrient presence determines inclusion in results",
           .tags(.property, .nutritionAPI))
     func testProperty_EnergyNutrientFiltering_1() async throws {
@@ -392,25 +391,24 @@ struct NutritionAPIClientTests {
         for _ in 0..<100 {
             let hasEnergy = Bool.random()
             let calories = Double.random(in: 1...2000)
-            let fdcId = Int.random(in: 1...999999)
+            let code = Int.random(in: 1...999999)
             
-            var nutrients = "["
+            var nutriments = ""
             if hasEnergy {
-                nutrients += "{\"nutrientNumber\": \"208\", \"value\": \(calories)}"
+                nutriments = "\"energy-kcal\": \(calories)"
             }
             if Bool.random() {
-                if hasEnergy { nutrients += "," }
-                nutrients += "{\"nutrientNumber\": \"203\", \"value\": \(Double.random(in: 0...100))}"
+                if hasEnergy { nutriments += "," }
+                nutriments += "\"proteins\": \(Double.random(in: 0...100))"
             }
-            nutrients += "]"
             
             mockSuccess(json: """
             {
-                "totalHits": 1,
-                "foods": [{
-                    "fdcId": \(fdcId),
-                    "description": "FOOD \(fdcId)",
-                    "foodNutrients": \(nutrients)
+                "count": 1,
+                "products": [{
+                    "code": "\(code)",
+                    "product_name": "Food \(code)",
+                    "nutriments": {\(nutriments)}
                 }]
             }
             """)
@@ -418,10 +416,10 @@ struct NutritionAPIClientTests {
             let results = try await client.searchFood(query: "test")
             
             if hasEnergy {
-                #expect(results.count == 1, "Food with Energy nutrient should be included (fdcId: \(fdcId))")
+                #expect(results.count == 1, "Product with energy-kcal should be included (code: \(code))")
                 #expect(abs(results[0].calories - calories) < 0.01)
             } else {
-                #expect(results.count == 0, "Food without Energy nutrient should be excluded (fdcId: \(fdcId))")
+                #expect(results.count == 0, "Product without energy-kcal should be excluded (code: \(code))")
             }
         }
     }
@@ -441,16 +439,16 @@ struct NutritionAPIClientTests {
             
             mockSuccess(json: """
             {
-                "totalHits": 1,
-                "foods": [{
-                    "fdcId": \(Int.random(in: 1...999999)),
-                    "description": "FOOD",
-                    "foodNutrients": [
-                        {"nutrientNumber": "208", "value": \(calories)},
-                        {"nutrientNumber": "203", "value": \(protein)},
-                        {"nutrientNumber": "205", "value": \(carbs)},
-                        {"nutrientNumber": "204", "value": \(fat)}
-                    ]
+                "count": 1,
+                "products": [{
+                    "code": "\(Int.random(in: 1...999999))",
+                    "product_name": "Food",
+                    "nutriments": {
+                        "energy-kcal": \(calories),
+                        "proteins": \(protein),
+                        "carbohydrates": \(carbs),
+                        "fat": \(fat)
+                    }
                 }]
             }
             """)
@@ -476,24 +474,24 @@ struct NutritionAPIClientTests {
             let hasServingSize = Bool.random()
             let servingSize = Double.random(in: 1...500)
             
-            var foodFields = """
-            "fdcId": \(Int.random(in: 1...999999)),
-            "description": "FOOD",
-            "foodNutrients": [{"nutrientNumber": "208", "value": 100.0}]
+            var productFields = """
+            "code": "\(Int.random(in: 1...999999))",
+            "product_name": "Food",
+            "nutriments": {"energy-kcal": 100.0}
             """
             
             if hasServingSize {
-                foodFields += """
+                productFields += """
                 ,
-                "servingSize": \(servingSize),
-                "servingSizeUnit": "ml"
+                "serving_quantity": \(servingSize),
+                "serving_quantity_unit": "ml"
                 """
             }
             
             mockSuccess(json: """
             {
-                "totalHits": 1,
-                "foods": [{\(foodFields)}]
+                "count": 1,
+                "products": [{\(productFields)}]
             }
             """)
             

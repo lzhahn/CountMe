@@ -15,6 +15,7 @@ import SwiftData
 /// - Adding food via search
 /// - Adding food manually
 /// - Editing and deleting items
+@MainActor
 final class CoreUIFlowsTests: XCTestCase {
     
     var modelContainer: ModelContainer!
@@ -35,10 +36,8 @@ final class CoreUIFlowsTests: XCTestCase {
         modelContext = ModelContext(modelContainer)
         
         // Initialize dependencies
-        dataStore = CountMe.DataStore(modelContext: modelContext)
-        apiClient = NutritionAPIClient(
-            apiKey: "test_key"
-        )
+        dataStore = CountMe.DataStore(modelContainer: modelContainer)
+        apiClient = NutritionAPIClient()
         
         // Initialize tracker on main actor
         await MainActor.run {
@@ -71,7 +70,7 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // Create a manual food item
-        let manualItem = FoodItem(
+        let manualItem = try FoodItem(
             name: "Homemade Salad",
             calories: 250.0,
             timestamp: Date(),
@@ -106,7 +105,7 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testAddMultipleFoodsManually() async throws {
         // Add first item
-        let item1 = FoodItem(
+        let item1 = try FoodItem(
             name: "Breakfast Oatmeal",
             calories: 150.0,
             source: .manual
@@ -114,7 +113,7 @@ final class CoreUIFlowsTests: XCTestCase {
         try await tracker.addFoodItem(item1)
         
         // Add second item
-        let item2 = FoodItem(
+        let item2 = try FoodItem(
             name: "Lunch Sandwich",
             calories: 350.0,
             source: .manual
@@ -122,7 +121,7 @@ final class CoreUIFlowsTests: XCTestCase {
         try await tracker.addFoodItem(item2)
         
         // Add third item
-        let item3 = FoodItem(
+        let item3 = try FoodItem(
             name: "Dinner Pasta",
             calories: 500.0,
             source: .manual
@@ -138,18 +137,15 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testManualEntryValidation() async throws {
         // Test with negative calories (should be rejected by validation)
-        let invalidItem = FoodItem(
-            name: "Invalid Food",
-            calories: -100.0,
-            source: .manual
-        )
-        
-        // Add the item (validation happens at UI level, but we can still add it)
-        try await tracker.addFoodItem(invalidItem)
-        
-        // The item is added, but in a real app, UI validation would prevent this
-        await MainActor.run {
-            XCTAssertEqual(tracker.currentLog?.foodItems.count, 1)
+        do {
+            let _ = try FoodItem(
+                name: "Invalid Food",
+                calories: -100.0,
+                source: .manual
+            )
+            XCTFail("Should throw validation error for negative calories")
+        } catch is ValidationError {
+            // Expected — validation correctly rejects negative calories
         }
     }
     
@@ -157,7 +153,7 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testAddFoodViaAPISearch() async throws {
         // Simulate selecting a food from API search results
-        let apiItem = FoodItem(
+        let apiItem = try FoodItem(
             name: "Chicken Breast",
             calories: 165.0,
             timestamp: Date(),
@@ -186,7 +182,7 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testAddMultipleFoodsFromDifferentSources() async throws {
         // Add manual item
-        let manualItem = FoodItem(
+        let manualItem = try FoodItem(
             name: "Homemade Smoothie",
             calories: 200.0,
             source: .manual
@@ -194,7 +190,7 @@ final class CoreUIFlowsTests: XCTestCase {
         try await tracker.addFoodItem(manualItem)
         
         // Add API item
-        let apiItem = FoodItem(
+        let apiItem = try FoodItem(
             name: "Apple",
             calories: 95.0,
             servingSize: "1",
@@ -219,8 +215,8 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testDeleteFoodItem() async throws {
         // Add two items
-        let item1 = FoodItem(name: "Item 1", calories: 100.0, source: .manual)
-        let item2 = FoodItem(name: "Item 2", calories: 200.0, source: .manual)
+        let item1 = try FoodItem(name: "Item 1", calories: 100.0, source: .manual)
+        let item2 = try FoodItem(name: "Item 2", calories: 200.0, source: .manual)
         
         try await tracker.addFoodItem(item1)
         try await tracker.addFoodItem(item2)
@@ -255,9 +251,9 @@ final class CoreUIFlowsTests: XCTestCase {
     func testDeleteAllItems() async throws {
         // Add multiple items
         let items = [
-            FoodItem(name: "Item 1", calories: 100.0, source: .manual),
-            FoodItem(name: "Item 2", calories: 200.0, source: .manual),
-            FoodItem(name: "Item 3", calories: 300.0, source: .manual)
+            try FoodItem(name: "Item 1", calories: 100.0, source: .manual),
+            try FoodItem(name: "Item 2", calories: 200.0, source: .manual),
+            try FoodItem(name: "Item 3", calories: 300.0, source: .manual)
         ]
         
         for item in items {
@@ -286,7 +282,7 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testUpdateFoodItem() async throws {
         // Add an item
-        let originalItem = FoodItem(
+        let originalItem = try FoodItem(
             name: "Original Name",
             calories: 100.0,
             servingSize: "1",
@@ -331,8 +327,8 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testUpdateMultipleItems() async throws {
         // Add multiple items
-        let item1 = FoodItem(name: "Item 1", calories: 100.0, source: .manual)
-        let item2 = FoodItem(name: "Item 2", calories: 200.0, source: .manual)
+        let item1 = try FoodItem(name: "Item 1", calories: 100.0, source: .manual)
+        let item2 = try FoodItem(name: "Item 2", calories: 200.0, source: .manual)
         
         try await tracker.addFoodItem(item1)
         try await tracker.addFoodItem(item2)
@@ -356,7 +352,7 @@ final class CoreUIFlowsTests: XCTestCase {
         // Simulate a complete day of tracking
         
         // 1. Add breakfast (manual)
-        let breakfast = FoodItem(
+        let breakfast = try FoodItem(
             name: "Oatmeal with Berries",
             calories: 250.0,
             source: .manual
@@ -368,7 +364,7 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // 2. Add lunch (from API)
-        let lunch = FoodItem(
+        let lunch = try FoodItem(
             name: "Grilled Chicken Salad",
             calories: 350.0,
             servingSize: "1",
@@ -382,7 +378,7 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // 3. Add snack (manual)
-        let snack = FoodItem(
+        let snack = try FoodItem(
             name: "Apple",
             calories: 95.0,
             source: .manual
@@ -402,7 +398,7 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // 5. Add correct snack
-        let correctSnack = FoodItem(
+        let correctSnack = try FoodItem(
             name: "Protein Bar",
             calories: 200.0,
             source: .api
@@ -422,7 +418,7 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // 7. Add dinner
-        let dinner = FoodItem(
+        let dinner = try FoodItem(
             name: "Salmon with Vegetables",
             calories: 450.0,
             servingSize: "1",
@@ -458,14 +454,14 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // Add food items
-        let item1 = FoodItem(name: "Breakfast", calories: 500.0, source: .manual)
+        let item1 = try FoodItem(name: "Breakfast", calories: 500.0, source: .manual)
         try await tracker.addFoodItem(item1)
         
         await MainActor.run {
             XCTAssertEqual(tracker.getRemainingCalories(), 1500.0)
         }
         
-        let item2 = FoodItem(name: "Lunch", calories: 700.0, source: .manual)
+        let item2 = try FoodItem(name: "Lunch", calories: 700.0, source: .manual)
         try await tracker.addFoodItem(item2)
         
         await MainActor.run {
@@ -473,7 +469,7 @@ final class CoreUIFlowsTests: XCTestCase {
         }
         
         // Add item that exceeds goal
-        let item3 = FoodItem(name: "Dinner", calories: 900.0, source: .manual)
+        let item3 = try FoodItem(name: "Dinner", calories: 900.0, source: .manual)
         try await tracker.addFoodItem(item3)
         
         await MainActor.run {
@@ -493,7 +489,7 @@ final class CoreUIFlowsTests: XCTestCase {
             )
         }
         
-        let item = FoodItem(name: "Test", calories: 100.0, source: .manual)
+        let item = try FoodItem(name: "Test", calories: 100.0, source: .manual)
         
         do {
             try await newTracker.addFoodItem(item)
@@ -507,11 +503,11 @@ final class CoreUIFlowsTests: XCTestCase {
     
     func testDeleteNonexistentItem() async throws {
         // Add an item
-        let item1 = FoodItem(name: "Item 1", calories: 100.0, source: .manual)
+        let item1 = try FoodItem(name: "Item 1", calories: 100.0, source: .manual)
         try await tracker.addFoodItem(item1)
         
         // Try to delete a different item that doesn't exist
-        let nonexistentItem = FoodItem(name: "Nonexistent", calories: 200.0, source: .manual)
+        let nonexistentItem = try FoodItem(name: "Nonexistent", calories: 200.0, source: .manual)
         
         // This should not throw an error, just do nothing
         try await tracker.removeFoodItem(nonexistentItem)

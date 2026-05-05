@@ -58,7 +58,17 @@ struct ProfileView: View {
                 accountActionsSection
             }
             .navigationTitle("Profile")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
+            #endif
             .disabled(isDeletingAccount || isSigningOut)
             .alert("Delete Account", isPresented: $showDeleteConfirmation) {
                 deleteAccountAlert
@@ -149,7 +159,9 @@ struct ProfileView: View {
                 Text("Age")
                 Spacer()
                 TextField("Age", value: $age, format: .number)
+                    #if os(iOS)
                     .keyboardType(.numberPad)
+                    #endif
                     .multilineTextAlignment(.trailing)
                     .frame(width: 60)
                 Text("years")
@@ -167,7 +179,9 @@ struct ProfileView: View {
                     Text("Height")
                     Spacer()
                     TextField("cm", value: $heightCm, format: .number)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
+                        #endif
                         .multilineTextAlignment(.trailing)
                         .frame(width: 60)
                     Text("cm")
@@ -178,13 +192,17 @@ struct ProfileView: View {
                     Text("Height")
                     Spacer()
                     TextField("ft", value: heightFeetBinding, format: .number)
+                        #if os(iOS)
                         .keyboardType(.numberPad)
+                        #endif
                         .multilineTextAlignment(.trailing)
                         .frame(width: 40)
                     Text("ft")
                         .foregroundColor(.secondary)
                     TextField("in", value: heightInchesBinding, format: .number)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
+                        #endif
                         .multilineTextAlignment(.trailing)
                         .frame(width: 40)
                     Text("in")
@@ -227,7 +245,9 @@ struct ProfileView: View {
                 Text("Body Weight")
                 Spacer()
                 TextField(bodyWeightUnit, value: weightBinding, format: .number)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
                 Text(bodyWeightUnit)
@@ -256,7 +276,9 @@ struct ProfileView: View {
                 Text("Weight Loss Rate")
                 Spacer()
                 TextField("lb/week", value: $weightLossLbsPerWeek, format: .number)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
                 Text("lb/wk")

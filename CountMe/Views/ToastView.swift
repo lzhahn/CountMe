@@ -52,7 +52,7 @@ struct ToastView: View {
             Spacer()
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.systemBackgroundColor)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         .padding(.horizontal)
@@ -114,7 +114,7 @@ extension View {
         Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(.systemGroupedBackground))
+    .background(Color.systemGroupedBackgroundColor)
     .overlay(alignment: .top) {
         ToastView(message: "Custom meal saved successfully!", style: .success)
             .padding(.top, 50)
@@ -126,7 +126,7 @@ extension View {
         Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(.systemGroupedBackground))
+    .background(Color.systemGroupedBackgroundColor)
     .overlay(alignment: .top) {
         ToastView(message: "Unable to save custom meal. Please try again.", style: .error)
             .padding(.top, 50)
@@ -138,7 +138,7 @@ extension View {
         Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color(.systemGroupedBackground))
+    .background(Color.systemGroupedBackgroundColor)
     .overlay(alignment: .top) {
         ToastView(message: "AI parsing may be incomplete. Please review carefully.", style: .warning)
             .padding(.top, 50)

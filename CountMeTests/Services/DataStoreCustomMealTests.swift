@@ -75,7 +75,7 @@ struct DataStoreCustomMealTests {
     @Test("Save and fetch custom meal") @MainActor
     func testSaveAndFetchCustomMeal() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save a custom meal
         let meal = try createTestMeal(name: "Chicken Stir Fry")
@@ -92,7 +92,7 @@ struct DataStoreCustomMealTests {
     @Test("Fetch custom meal by ID") @MainActor
     func testFetchCustomMealById() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save a custom meal
         let meal = try createTestMeal(name: "Pasta Carbonara")
@@ -109,7 +109,7 @@ struct DataStoreCustomMealTests {
     @Test("Fetch non-existent custom meal returns nil") @MainActor
     func testFetchNonExistentMeal() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Try to fetch a meal that doesn't exist
         let nonExistentId = UUID()
@@ -123,7 +123,7 @@ struct DataStoreCustomMealTests {
     @Test("Update custom meal") @MainActor
     func testUpdateCustomMeal() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save a custom meal
         let meal = try createTestMeal(name: "Original Name")
@@ -143,7 +143,7 @@ struct DataStoreCustomMealTests {
     @Test("Delete custom meal") @MainActor
     func testDeleteCustomMeal() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save a custom meal
         let meal = try createTestMeal(name: "To Be Deleted")
@@ -164,7 +164,7 @@ struct DataStoreCustomMealTests {
     @Test("Delete custom meal cascades to ingredients") @MainActor
     func testDeleteCascadesToIngredients() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create a meal with multiple ingredients
         let ingredients = [
@@ -191,7 +191,7 @@ struct DataStoreCustomMealTests {
     @Test("Search custom meals by name (case-insensitive)") @MainActor
     func testSearchCustomMeals() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save multiple meals
         try await dataStore.saveCustomMeal(try createTestMeal(name: "Chicken Stir Fry"))
@@ -209,7 +209,7 @@ struct DataStoreCustomMealTests {
     @Test("Search with empty query returns all meals") @MainActor
     func testSearchWithEmptyQuery() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save multiple meals
         try await dataStore.saveCustomMeal(try createTestMeal(name: "Meal 1"))
@@ -225,7 +225,7 @@ struct DataStoreCustomMealTests {
     @Test("Search with no matches returns empty array") @MainActor
     func testSearchWithNoMatches() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create and save meals
         try await dataStore.saveCustomMeal(try createTestMeal(name: "Chicken Stir Fry"))
@@ -242,7 +242,7 @@ struct DataStoreCustomMealTests {
     @Test("Fetch all custom meals sorted by lastUsedAt (most recent first)") @MainActor
     func testFetchAllSortedByLastUsedAt() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create meals with different lastUsedAt timestamps
         let now = Date()
@@ -267,7 +267,7 @@ struct DataStoreCustomMealTests {
     @Test("Search results sorted by lastUsedAt (most recent first)") @MainActor
     func testSearchResultsSortedByLastUsedAt() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         
         // Create meals with "chicken" in name and different timestamps
         let now = Date()

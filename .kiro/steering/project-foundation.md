@@ -9,7 +9,7 @@ CountMe is an iOS calorie tracking app built with SwiftUI and SwiftData. Integra
 - **Platform**: iOS (SwiftUI) - Target: iPhone 17
 - **Persistence**: SwiftData (local) + Firestore (cloud)
 - **APIs**: OpenFoodFacts API (no auth required), Firebase Auth/Firestore
-- **Architecture**: MVVM, actor-based concurrency
+- **Architecture**: MVVM, @MainActor-based concurrency
 - **Testing**: Swift Testing with property-based tests
 
 ## Core Architecture
@@ -35,8 +35,8 @@ SwiftUI Views → View Models → Services → DataStore (SwiftData) / Firestore
 ### Date Normalization
 All dates normalized to midnight for consistent daily log retrieval via `DataStore.normalizeDate()`
 
-### Actor-Based Concurrency
-DataStore and FirebaseSyncEngine are actors for thread-safe operations. All mutations use async/await.
+### MainActor-Based Concurrency
+DataStore is a `@MainActor final class` using `modelContainer.mainContext` for thread-safe SwiftData operations. FirebaseSyncEngine is an actor that delegates all SwiftData mutations to DataStore's MainActor methods. Firestore listener events are serialized through a single `AsyncStream` to prevent concurrent context modifications. All mutations use async/await.
 
 ### Dual Persistence (Firebase)
 All data stored locally (SwiftData) AND cloud (Firestore) when authenticated. Offline-first with automatic sync.
@@ -126,7 +126,7 @@ Swift uses module-based imports. Moving files within the CountMe target does NOT
 ## Notes
 
 - Always normalize dates before daily log operations
-- Use DataStore actor for all persistence
+- Use DataStore (@MainActor) for all persistence
 - Validate API responses before parsing
 - Implement unit + property tests
 - 90-day retention for daily logs only

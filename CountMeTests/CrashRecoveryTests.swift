@@ -11,6 +11,7 @@ import SwiftData
 @testable import CountMe
 
 /// Tests that verify data persists and can be recovered after unexpected app termination
+@MainActor
 final class CrashRecoveryTests: XCTestCase {
     
     var testContainer: ModelContainer!
@@ -78,7 +79,7 @@ final class CrashRecoveryTests: XCTestCase {
         )
         
         // Save data using DataStore
-        let dataStore = DataStore(modelContext: testContext)
+        let dataStore = DataStore(modelContainer: testContainer)
         try await dataStore.saveDailyLog(dailyLog)
         
         // Verify data was saved
@@ -93,7 +94,7 @@ final class CrashRecoveryTests: XCTestCase {
         
         // Create new context (simulating app restart)
         testContext = ModelContext(testContainer)
-        let newDataStore = DataStore(modelContext: testContext)
+        let newDataStore = DataStore(modelContainer: testContainer)
         
         // Phase 3: Verify data recovery after "crash"
         let recoveredLog = try await newDataStore.fetchDailyLog(for: beforeCrashDate)
@@ -154,7 +155,7 @@ final class CrashRecoveryTests: XCTestCase {
         )
         
         // Save all logs
-        let dataStore = DataStore(modelContext: testContext)
+        let dataStore = DataStore(modelContainer: testContainer)
         try await dataStore.saveDailyLog(log1)
         try await dataStore.saveDailyLog(log2)
         try await dataStore.saveDailyLog(log3)
@@ -162,7 +163,7 @@ final class CrashRecoveryTests: XCTestCase {
         // Simulate crash
         testContext = nil
         testContext = ModelContext(testContainer)
-        let newDataStore = DataStore(modelContext: testContext)
+        let newDataStore = DataStore(modelContainer: testContainer)
         
         // Verify all logs are recovered
         let recoveredLog1 = try await newDataStore.fetchDailyLog(for: today)
@@ -189,7 +190,7 @@ final class CrashRecoveryTests: XCTestCase {
         let foodItem = try FoodItem(name: "Original", calories: 100.0, source: .manual)
         let dailyLog = try DailyLog(date: date, foodItems: [foodItem], dailyGoal: 2000.0)
         
-        let dataStore = DataStore(modelContext: testContext)
+        let dataStore = DataStore(modelContainer: testContainer)
         try await dataStore.saveDailyLog(dailyLog)
         
         // Modify the data
@@ -201,7 +202,7 @@ final class CrashRecoveryTests: XCTestCase {
         // Simulate crash
         testContext = nil
         testContext = ModelContext(testContainer)
-        let newDataStore = DataStore(modelContext: testContext)
+        let newDataStore = DataStore(modelContainer: testContainer)
         
         // Verify modifications persisted
         let recoveredLog = try await newDataStore.fetchDailyLog(for: date)
@@ -222,7 +223,7 @@ final class CrashRecoveryTests: XCTestCase {
         let item2 = try FoodItem(name: "Delete", calories: 200.0, source: .manual)
         let dailyLog = try DailyLog(date: date, foodItems: [item1, item2])
         
-        let dataStore = DataStore(modelContext: testContext)
+        let dataStore = DataStore(modelContainer: testContainer)
         try await dataStore.saveDailyLog(dailyLog)
         
         // Delete one item
@@ -231,7 +232,7 @@ final class CrashRecoveryTests: XCTestCase {
         // Simulate crash
         testContext = nil
         testContext = ModelContext(testContainer)
-        let newDataStore = DataStore(modelContext: testContext)
+        let newDataStore = DataStore(modelContainer: testContainer)
         
         // Verify deletion persisted
         let recoveredLog = try await newDataStore.fetchDailyLog(for: date)
@@ -247,13 +248,13 @@ final class CrashRecoveryTests: XCTestCase {
         let date = Date()
         let emptyLog = try DailyLog(date: date, foodItems: [], dailyGoal: 2000.0)
         
-        let dataStore = DataStore(modelContext: testContext)
+        let dataStore = DataStore(modelContainer: testContainer)
         try await dataStore.saveDailyLog(emptyLog)
         
         // Simulate crash
         testContext = nil
         testContext = ModelContext(testContainer)
-        let newDataStore = DataStore(modelContext: testContext)
+        let newDataStore = DataStore(modelContainer: testContainer)
         
         // Verify empty log is recovered
         let recoveredLog = try await newDataStore.fetchDailyLog(for: date)
@@ -275,13 +276,13 @@ final class CrashRecoveryTests: XCTestCase {
         
         let dailyLog = try DailyLog(date: baseDate, foodItems: [item1, item2])
         
-        let dataStore = DataStore(modelContext: testContext)
+        let dataStore = DataStore(modelContainer: testContainer)
         try await dataStore.saveDailyLog(dailyLog)
         
         // Simulate crash
         testContext = nil
         testContext = ModelContext(testContainer)
-        let newDataStore = DataStore(modelContext: testContext)
+        let newDataStore = DataStore(modelContainer: testContainer)
         
         // Verify timestamps are preserved
         let recoveredLog = try await newDataStore.fetchDailyLog(for: baseDate)

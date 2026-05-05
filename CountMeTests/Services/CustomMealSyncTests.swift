@@ -53,7 +53,7 @@ struct CustomMealSyncTests {
     @Test("addCustomMealToLog creates FoodItem in the provided daily log")
     func testAddCustomMealToLog_CreatesItemInLog() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 
@@ -82,7 +82,7 @@ struct CustomMealSyncTests {
     @Test("addCustomMealToLog with serving multiplier scales nutrition correctly")
     func testAddCustomMealToLog_ServingMultiplierScales() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 
@@ -109,7 +109,7 @@ struct CustomMealSyncTests {
     @Test("addCustomMealToLog rejects zero serving multiplier")
     func testAddCustomMealToLog_ZeroMultiplier_Throws() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 
@@ -136,7 +136,7 @@ struct CustomMealSyncTests {
     @Test("addCustomMealToLog updates meal lastUsedAt timestamp")
     func testAddCustomMealToLog_UpdatesLastUsedAt() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 
@@ -160,7 +160,7 @@ struct CustomMealSyncTests {
     @Test("configureSyncEngine sets sync engine and userId on manager")
     func testConfigureSyncEngine_SetsProperties() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 
@@ -188,7 +188,7 @@ struct CustomMealSyncTests {
     @Test("CustomMealManager initialized with syncEngine passes it to food items")
     func testInitWithSyncEngine_FoodItemsGetUserId() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         let manager = CustomMealManager(
@@ -220,7 +220,7 @@ struct CustomMealSyncTests {
           .tags(.property))
     func testProperty_ServingMultiplierScaling_1() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 
@@ -276,7 +276,7 @@ struct CustomMealSyncTests {
           .tags(.property))
     func testProperty_CustomMealSource_2() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
 

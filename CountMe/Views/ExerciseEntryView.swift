@@ -95,7 +95,9 @@ struct ExerciseEntryView: View {
                     HStack {
                         TextField("Duration", text: $durationText)
                             .focused($focusedField, equals: .duration)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         
                         Text("minutes")
                             .foregroundColor(.secondary)
@@ -109,7 +111,9 @@ struct ExerciseEntryView: View {
                 Section {
                     HStack {
                         TextField("Body Weight", value: weightBinding, format: .number)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                         
                         Text(bodyWeightUnit)
                             .foregroundColor(.secondary)
@@ -157,7 +161,9 @@ struct ExerciseEntryView: View {
                 }
             }
             .navigationTitle(editingItem == nil ? "Add Exercise" : "Edit Exercise")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

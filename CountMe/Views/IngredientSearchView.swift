@@ -70,7 +70,11 @@ struct IngredientSearchView: View {
                 }
             }
             .navigationTitle("Search Ingredients")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -102,7 +106,9 @@ struct IngredientSearchView: View {
             TextField("Search for an ingredient...", text: $searchQuery)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
                 .submitLabel(.search)
                 .onSubmit { performSearch() }
                 .onChange(of: searchQuery) { _, newValue in
@@ -137,7 +143,7 @@ struct IngredientSearchView: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(10)
         .padding()
     }

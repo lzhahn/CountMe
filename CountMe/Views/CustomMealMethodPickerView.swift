@@ -87,7 +87,11 @@ struct CustomMealMethodPickerView: View {
                 Spacer()
             }
             .navigationTitle("New Custom Meal")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -144,7 +148,7 @@ struct CustomMealMethodPickerView: View {
                 .foregroundColor(.secondary)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
 }

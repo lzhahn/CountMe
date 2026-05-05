@@ -37,7 +37,7 @@ struct ManualIngredientEntryViewTests {
     }
 
     private func createTestManager(container: ModelContainer) -> CustomMealManager {
-        let dataStore = DataStore(modelContext: container.mainContext)
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         return CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     }

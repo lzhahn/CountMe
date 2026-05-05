@@ -15,6 +15,7 @@ import SwiftData
 /// Validates that exercise items are properly synced to Firestore when added,
 /// and that the sync engine correctly handles the dual-persistence model.
 @Suite("Exercise Sync Tests")
+@MainActor
 struct ExerciseSyncTests {
     
     // MARK: - Test Helpers
@@ -39,7 +40,7 @@ struct ExerciseSyncTests {
     func testSyncExerciseItem_ExistingItem_UpdatesInsteadOfInsert() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         // Create and insert an exercise item (simulating what happens in CalorieTracker)
@@ -86,7 +87,7 @@ struct ExerciseSyncTests {
     func testSyncFoodItem_ExistingItem_UpdatesInsteadOfInsert() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         // Create and insert a food item (simulating what happens in CalorieTracker)
@@ -130,7 +131,7 @@ struct ExerciseSyncTests {
     func testExerciseSync_AfterAddingToLog_UpdatesMetadata() async throws {
         // Setup
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         let today = Date()
@@ -171,7 +172,7 @@ struct ExerciseSyncTests {
           .tags(.property, .exerciseSync))
     func testProperty_ExerciseSync_1() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         for _ in 0..<100 {
@@ -214,7 +215,7 @@ struct ExerciseSyncTests {
         // Previously, only food items, daily logs, and custom meals were downloaded
         
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let syncEngine = FirebaseSyncEngine(dataStore: dataStore)
         
         // Create exercise items that would be in Firestore

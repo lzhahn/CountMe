@@ -34,7 +34,7 @@ struct CrossActorSyncTests {
     @Test("updateDailyLogCloudProperties updates goal, timestamp, and syncStatus")
     func testUpdateCloudProperties_UpdatesAllFields() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let log = try DailyLog(date: Date(), userId: "user1", syncStatus: .pendingUpload)
         try await dataStore.insertDailyLog(log)
@@ -52,7 +52,7 @@ struct CrossActorSyncTests {
     @Test("updateDailyLogCloudProperties normalizes date")
     func testUpdateCloudProperties_NormalizesDate() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let calendar = Calendar.current
         var comps = calendar.dateComponents([.year, .month, .day], from: Date())
@@ -74,7 +74,7 @@ struct CrossActorSyncTests {
     @Test("updateDailyLogCloudProperties sets nil goal")
     func testUpdateCloudProperties_NilGoal() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let log = try DailyLog(date: Date(), dailyGoal: 2000, userId: "user1", syncStatus: .synced)
         try await dataStore.insertDailyLog(log)
@@ -91,7 +91,7 @@ struct CrossActorSyncTests {
     @Test("applyMergedDailyLogProperties copies food items from source to target")
     func testApplyMerged_CopiesFoodItems() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -117,7 +117,7 @@ struct CrossActorSyncTests {
     @Test("applyMergedDailyLogProperties skips duplicate food items")
     func testApplyMerged_SkipsDuplicates() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -138,7 +138,7 @@ struct CrossActorSyncTests {
     @Test("applyMergedDailyLogProperties copies exercise items")
     func testApplyMerged_CopiesExerciseItems() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         
@@ -161,7 +161,7 @@ struct CrossActorSyncTests {
     @Test("associateItemsWithDailyLog appends food and exercise items")
     func testAssociateItems_AppendsBoth() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let log = try DailyLog(date: Date(), userId: "user1", syncStatus: .synced)
         try await dataStore.insertDailyLog(log)
@@ -182,7 +182,7 @@ struct CrossActorSyncTests {
     @Test("associateItemsWithDailyLog skips already-associated items")
     func testAssociateItems_SkipsDuplicates() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let food = try FoodItem(name: "Egg", calories: 70, source: .manual, userId: "user1", syncStatus: .synced)
         try await dataStore.insertFoodItem(food)
@@ -199,7 +199,7 @@ struct CrossActorSyncTests {
     @Test("associateItemsWithDailyLog handles empty arrays")
     func testAssociateItems_EmptyArrays() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let log = try DailyLog(date: Date(), userId: "user1", syncStatus: .synced)
         try await dataStore.insertDailyLog(log)
@@ -213,7 +213,7 @@ struct CrossActorSyncTests {
     @Test("associateItemsWithDailyLog persists after re-fetch")
     func testAssociateItems_PersistsAfterRefetch() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         
         let today = Calendar.current.startOfDay(for: Date())
         let log = try DailyLog(date: today, userId: "user1", syncStatus: .synced)

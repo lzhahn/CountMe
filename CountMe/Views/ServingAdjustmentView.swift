@@ -119,7 +119,11 @@ struct ServingAdjustmentView: View {
                                 .tag(option)
                             }
                         }
+                        #if os(iOS)
                         .pickerStyle(.navigationLink)
+                        #else
+                        .pickerStyle(.menu)
+                        #endif
                     } else {
                         // Single option: show read-only display
                         HStack {
@@ -146,7 +150,9 @@ struct ServingAdjustmentView: View {
                         Spacer()
                         TextField("Amount", text: $servingText)
                             .focused($isServingFieldFocused)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
                             .onChange(of: servingText) { _, newValue in
@@ -218,7 +224,11 @@ struct ServingAdjustmentView: View {
                 }
             }
             .navigationTitle("Adjust Serving")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -341,10 +351,9 @@ struct ServingAdjustmentView: View {
     @Previewable @State var tracker: CalorieTracker = {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
-        let context = ModelContext(container)
         
         return CalorieTracker(
-            dataStore: DataStore(modelContext: context),
+            dataStore: DataStore(modelContainer: container),
             apiClient: NutritionAPIClient()
         )
     }()

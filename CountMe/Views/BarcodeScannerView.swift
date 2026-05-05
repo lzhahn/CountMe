@@ -47,6 +47,7 @@ struct BarcodeScannerView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                #if os(iOS)
                 // Camera preview or permission prompt
                 if cameraPermission == .authorized {
                     BarcodeScannerCameraView(
@@ -57,6 +58,23 @@ struct BarcodeScannerView: View {
                 } else {
                     permissionView
                 }
+                #else
+                // macOS: no camera barcode scanning, show manual entry prompt
+                VStack(spacing: 20) {
+                    Image(systemName: "barcode.viewfinder")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray)
+                    Text("Barcode scanning is not available on macOS.")
+                        .font(.headline)
+                    Text("Please use manual entry instead.")
+                        .foregroundColor(.secondary)
+                    Button("Manual Entry") {
+                        showingManualEntry = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #endif
                 
                 // Overlay UI
                 VStack {
@@ -81,7 +99,9 @@ struct BarcodeScannerView: View {
                 .padding()
             }
             .navigationTitle("Scan Barcode")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -140,7 +160,7 @@ struct BarcodeScannerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.systemBackgroundColor)
     }
     
     /// Scanning frame overlay
@@ -239,9 +259,11 @@ struct BarcodeScannerView: View {
     
     /// Opens app settings
     private func openSettings() {
+        #if os(iOS)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
+        #endif
     }
     
     /// Handles a scanned barcode
@@ -254,8 +276,10 @@ struct BarcodeScannerView: View {
         errorMessage = nil
         
         // Haptic feedback
+        #if os(iOS)
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
+        #endif
         
         Task {
             do {
@@ -288,6 +312,7 @@ struct BarcodeScannerView: View {
 
 // MARK: - Camera View
 
+#if os(iOS)
 /// Camera view for barcode scanning using AVFoundation
 struct BarcodeScannerCameraView: UIViewControllerRepresentable {
     /// Binding to the scanned code
@@ -423,15 +448,15 @@ class BarcodeScannerViewController: UIViewController, AVCaptureMetadataOutputObj
         }
     }
 }
+#endif
 
 // MARK: - Preview
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, configurations: config)
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let tracker = CalorieTracker(
         dataStore: dataStore,
         apiClient: NutritionAPIClient()

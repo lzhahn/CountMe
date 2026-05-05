@@ -90,7 +90,9 @@ struct CustomMealDetailView: View {
             .padding()
         }
         .navigationTitle(meal.name)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
+        #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(role: .destructive) {
@@ -192,7 +194,9 @@ struct CustomMealDetailView: View {
                             .font(.subheadline)
                         
                         TextField("1", text: $servingCountText)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 60)
                             .onChange(of: servingCountText) { _, newValue in
@@ -313,7 +317,7 @@ struct CustomMealDetailView: View {
                 Spacer()
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.systemGray6Color)
             .cornerRadius(10)
             
             // Show per-serving nutrition if available
@@ -490,7 +494,7 @@ struct CustomMealDetailView: View {
                 }
             }
             .padding()
-            .background(meal.hasMultipleServings ? Color.blue.opacity(0.1) : Color(.systemGray6))
+            .background(meal.hasMultipleServings ? Color.blue.opacity(0.1) : Color.systemGray6Color)
             .cornerRadius(10)
         }
     }
@@ -579,7 +583,7 @@ struct CustomMealDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(10)
     }
     
@@ -834,9 +838,8 @@ struct CustomMealDetailView: View {
         for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self,
         configurations: config
     )
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let aiParser = AIRecipeParser()
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     

@@ -27,7 +27,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add generates default name from single ingredient")
     func testQuickAdd_SingleIngredient_GeneratesName() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -56,7 +56,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add generates default name from two ingredients")
     func testQuickAdd_TwoIngredients_GeneratesName() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -78,7 +78,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add generates default name from multiple ingredients")
     func testQuickAdd_MultipleIngredients_GeneratesName() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -102,7 +102,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add preserves all nutritional data")
     func testQuickAdd_PreservesNutritionalData() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -153,7 +153,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add respects serving count")
     func testQuickAdd_RespectsServingCount() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -181,7 +181,7 @@ struct RecipeQuickAddTests {
           .tags(.property))
     func testProperty_QuickAdd_PreservesCalories() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -225,7 +225,7 @@ struct RecipeQuickAddTests {
           .tags(.property))
     func testProperty_QuickAdd_PreservesMacros() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -281,7 +281,7 @@ struct RecipeQuickAddTests {
           .tags(.property))
     func testProperty_QuickAdd_PerServingCalculations() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -317,7 +317,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add handles empty ingredients gracefully")
     func testQuickAdd_EmptyIngredients_ThrowsError() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -342,7 +342,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add handles invalid serving count")
     func testQuickAdd_InvalidServingCount_UsesDefault() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         
@@ -367,7 +367,7 @@ struct RecipeQuickAddTests {
     @Test("Quick add handles very long ingredient names")
     func testQuickAdd_LongIngredientNames_Truncates() async throws {
         let container = try createTestContainer()
-        let dataStore = DataStore(modelContext: ModelContext(container))
+        let dataStore = DataStore(modelContainer: container)
         let aiParser = AIRecipeParser()
         let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
         

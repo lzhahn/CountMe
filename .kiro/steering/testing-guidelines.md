@@ -10,7 +10,7 @@ CountMe uses Swift Testing framework with a focus on property-based testing to e
 - **Unit Tests**: Test specific examples, edge cases, and error conditions
 - **Coverage Goals**: 90%+ for business logic, 100% for error handling
 - **Offline-First**: All tests must pass without network connectivity
-- **Actor Safety**: Test concurrent access patterns for DataStore and FirebaseSyncEngine
+- **Concurrency Safety**: Test @MainActor DataStore access and actor-based FirebaseSyncEngine patterns
 
 ## Test Organization
 
@@ -85,7 +85,7 @@ func generateRandomFoodItem() -> FoodItem {
 
 ## Unit Testing Patterns
 
-### Testing DataStore (Actor)
+### Testing DataStore (@MainActor)
 ```swift
 @Test("Add food item persists to SwiftData")
 func testAddFoodItem_ValidData_PersistsSuccessfully() async throws {

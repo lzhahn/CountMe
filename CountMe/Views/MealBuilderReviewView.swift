@@ -86,7 +86,11 @@ struct MealBuilderReviewView: View {
                 ingredientsList
             }
             .navigationTitle("Review Custom Meal")
+            #if os(iOS)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -146,7 +150,9 @@ struct MealBuilderReviewView: View {
             HStack {
                 Text("This recipe makes")
                 TextField("1", text: $servingCountText)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 60)
                     .onChange(of: servingCountText) { _, newValue in
@@ -209,7 +215,7 @@ struct MealBuilderReviewView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
     }
     
     /// Nutritional badge component
@@ -251,7 +257,9 @@ struct MealBuilderReviewView: View {
                 Text("Ingredients (\(ingredients.count))")
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
     }
     
     // MARK: - Computed Properties
@@ -502,7 +510,9 @@ struct IngredientEditRow: View {
                     
                     TextField("Quantity", value: $ingredient.quantity, format: .number)
                         .textFieldStyle(.roundedBorder)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
+                        #endif
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -523,7 +533,9 @@ struct IngredientEditRow: View {
                 
                 TextField("Calories", value: $ingredient.calories, format: .number)
                     .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
                     .keyboardType(.decimalPad)
+                    #endif
             }
             
             // Macros (optional)
@@ -540,7 +552,7 @@ struct IngredientEditRow: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(8)
     }
     
@@ -553,7 +565,9 @@ struct IngredientEditRow: View {
             
             TextField("0", value: value, format: .number)
                 .textFieldStyle(.roundedBorder)
+                #if os(iOS)
                 .keyboardType(.decimalPad)
+                #endif
         }
         .frame(maxWidth: .infinity)
     }
@@ -598,9 +612,8 @@ struct IngredientEditRow: View {
     
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self, configurations: config)
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let aiParser = AIRecipeParser()
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     
@@ -637,9 +650,8 @@ struct IngredientEditRow: View {
     
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: DailyLog.self, FoodItem.self, CustomMeal.self, Ingredient.self, configurations: config)
-    let context = ModelContext(container)
     
-    let dataStore = DataStore(modelContext: context)
+    let dataStore = DataStore(modelContainer: container)
     let aiParser = AIRecipeParser()
     let manager = CustomMealManager(dataStore: dataStore, aiParser: aiParser)
     

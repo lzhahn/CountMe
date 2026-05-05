@@ -29,7 +29,7 @@ struct ExerciseTrackerView: View {
             .padding()
             .navigationTitle("Exercise")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .trailingNavBar) {
                     Button {
                         showingExerciseEntry = true
                     } label: {
@@ -70,7 +70,7 @@ struct ExerciseTrackerView: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.systemGray6Color)
         .cornerRadius(12)
     }
     
